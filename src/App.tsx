@@ -8,6 +8,10 @@ import HorasSimulator from './components/HorasSimulator';
 import AnimatedCounter from './components/AnimatedCounter';
 import Typewriter from './components/Typewriter';
 
+import psSystemMockup from './assets/images/ps_system_mockup_1780460973153.png';
+import horasErpMockup from './assets/images/horas_erp_mockup_1780456782429.png';
+import horasShopMockup from './assets/images/horas_shop_mockup_1780461267914.png';
+
 export default function App() {
   // State variables
   const [lang, setLang] = useState<Language>('en');
@@ -984,7 +988,7 @@ export default function App() {
                       {/* Interactive visual media dashboard box with image */}
                       <div className="relative w-full aspect-video bg-surface-lowest rounded-lg overflow-hidden border border-white/5 active-glow-shadow">
                         <img
-                          src="/src/assets/images/ps_system_mockup_1780460973153.png"
+                          src={psSystemMockup}
                           alt="PlayStation Management System Representation"
                           className="w-full h-full object-cover hover:scale-[1.02] transition-all duration-500"
                           referrerPolicy="no-referrer"
@@ -1063,7 +1067,7 @@ export default function App() {
                       {/* Interactive visual media dashboard box with image */}
                       <div className="relative w-full aspect-video bg-surface-lowest rounded-lg overflow-hidden border border-white/5 active-glow-shadow">
                         <img
-                          src="/src/assets/images/horas_erp_mockup_1780456782429.png"
+                          src={horasErpMockup}
                           alt="HORAS Dashboard interface representation"
                           className="w-full h-full object-cover hover:scale-[1.02] transition-all duration-500"
                           referrerPolicy="no-referrer"
@@ -1189,7 +1193,7 @@ export default function App() {
                       {/* Interactive visual media dashboard box with image */}
                       <div className="relative w-full aspect-video bg-surface-lowest rounded-lg overflow-hidden border border-white/5 active-glow-shadow">
                         <img
-                          src="/src/assets/images/horas_shop_mockup_1780461267914.png"
+                          src={horasShopMockup}
                           alt="HORAS Shop E-Commerce interface representation"
                           className="w-full h-full object-cover hover:scale-[1.02] transition-all duration-500"
                           referrerPolicy="no-referrer"
