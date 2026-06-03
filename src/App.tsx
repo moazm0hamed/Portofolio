@@ -11,6 +11,7 @@ import Typewriter from './components/Typewriter';
 import psSystemMockup from './assets/images/ps_system_mockup_1780460973153.png';
 import horasErpMockup from './assets/images/horas_erp_mockup_1780456782429.png';
 import horasShopMockup from './assets/images/horas_shop_mockup_1780461267914.png';
+import developerLogo from './assets/images/developer_logo_1780506584453.png';
 
 export default function App() {
   // State variables
@@ -523,10 +524,13 @@ export default function App() {
           <a
             href="#home"
             onClick={(e) => { e.preventDefault(); handleTabChange('home'); }}
-            className={`font-black text-2xl tracking-tighter cursor-pointer select-none drop-shadow-[0_0_8px_rgba(0,240,255,0.45)] hover:opacity-85 transition-opacity ${getPrimaryTextColor()}`}
+            className={`flex items-center gap-2.5 font-black text-base md:text-xl tracking-tight cursor-pointer select-none hover:opacity-85 transition-opacity ${getPrimaryTextColor()}`}
             id="brand-logo"
           >
-            MZ
+            <div className="w-8 h-8 rounded-full border border-primary-container/30 overflow-hidden bg-white/5 active-glow-shadow flex items-center justify-center shrink-0">
+              <img src={developerLogo} alt="Moaz Mohamed" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            </div>
+            <span>Moaz Mohamed</span>
           </a>
 
           {/* Desktop Nav */}
@@ -2202,9 +2206,12 @@ export default function App() {
           <a
             href="#home"
             onClick={(e) => { e.preventDefault(); handleTabChange('home'); }}
-            className={`font-black text-lg select-none cursor-pointer tracking-wider ${getPrimaryTextColor()}`}
+            className={`flex items-center gap-2 font-bold text-base select-none cursor-pointer tracking-wide ${getPrimaryTextColor()}`}
           >
-            MZ
+            <div className="w-6 h-6 rounded-full border border-primary-container/20 overflow-hidden bg-white/5 flex items-center justify-center shrink-0">
+              <img src={developerLogo} alt="Moaz Mohamed" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            </div>
+            <span>Moaz Mohamed</span>
           </a>
 
           {/* Sitemap labels links */}
