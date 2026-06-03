@@ -1,0 +1,189 @@
+@import "tailwindcss";
+
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&family=JetBrains+Mono:wght@400;700&family=Sora:wght@400;600;800&display=swap');
+
+@theme {
+  --color-surface-container-high: #292a2a;
+  --color-on-error: #690005;
+  --color-primary-container: #00f0ff;
+  --color-surface-bright: #383939;
+  --color-on-primary-fixed-variant: #004f54;
+  --color-on-secondary-fixed-variant: #5700c9;
+  --color-tertiary-fixed-dim: #c9c6c5;
+  --color-inverse-primary: #006970;
+  --color-on-secondary-container: #ddcdff;
+  --color-surface-tint: #00dbe9;
+  --color-surface-dim: #121414;
+  --color-error-container: #93000a;
+  --color-inverse-surface: #e3e2e2;
+  --color-surface: #121414;
+  --color-secondary-fixed-dim: #d1bcff;
+  --color-on-primary: #00363a;
+  --color-background: #121414;
+  --color-on-surface: #e3e2e2;
+  --color-on-secondary: #3c0090;
+  --color-surface-container-lowest: #0d0e0f;
+  --color-secondary-container: #7000ff;
+  --color-tertiary: #f9f5f5;
+  --color-primary-fixed-dim: #00dbe9;
+  --color-primary-fixed: #7df4ff;
+  --color-outline: #849495;
+  --color-on-secondary-fixed: #23005b;
+  --color-on-primary-fixed: #002022;
+  --color-on-tertiary-fixed-variant: #474646;
+  --color-primary: #dbfcff;
+  --color-on-background: #e3e2e2;
+  --color-surface-container: #1e2020;
+  --color-surface-variant: #343535;
+  --color-on-surface-variant: #b9cacb;
+  --color-secondary-fixed: #e9ddff;
+  --color-secondary: #d1bcff;
+  --color-inverse-on-surface: #2f3131;
+  --color-surface-container-low: #1a1c1c;
+  --color-tertiary-container: #dcd9d8;
+  --color-tertiary-fixed: #e5e2e1;
+  --color-on-tertiary-container: #605e5e;
+  --color-on-error-container: #ffdad6;
+  --color-outline-variant: #3b494b;
+  --color-on-tertiary: #313030;
+  --color-error: #ffb4ab;
+  --color-on-primary-container: #006970;
+  --color-surface-container-highest: #343535;
+  --color-on-tertiary-fixed: #1c1b1b;
+
+  --font-sans: "Sora", "Cairo", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+body {
+  background-color: #050505;
+  color: #e3e2e2;
+  font-family: 'Sora', 'Cairo', sans-serif;
+  overflow-x: hidden;
+}
+
+/* Custom RTL styling */
+[dir="rtl"] {
+  font-family: 'Cairo', 'Sora', sans-serif;
+}
+
+.glass-panel {
+  background: rgba(15,15,20,0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-top-color: rgba(255,255,255,0.18);
+  border-left-color: rgba(255,255,255,0.18);
+}
+
+.neon-glow {
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.12);
+}
+
+.neon-glow-intense {
+  box-shadow: 0 0 30px rgba(0, 240, 255, 0.25);
+}
+
+.violet-glow {
+  box-shadow: 0 0 20px rgba(112, 0, 255, 0.12);
+}
+
+.bg-grid {
+  background-size: 40px 40px;
+  background-image: linear-gradient(to right, rgba(0, 240, 255, 0.04) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(0, 240, 255, 0.04) 1px, transparent 1px);
+}
+
+.data-stream {
+  position: absolute;
+  top: -100%;
+  width: 2px;
+  height: 50%;
+  background: linear-gradient(to bottom, transparent, #00f0ff);
+  animation: dataStream 4s linear infinite;
+  opacity: 0.15;
+}
+
+@keyframes dataStream {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(300vh); }
+}
+
+.timeline-line {
+  position: absolute;
+  left: 20px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: linear-gradient(to bottom, #00f0ff, rgba(0,240,255,0.1));
+}
+
+[dir="rtl"] .timeline-line {
+  left: auto;
+  right: 20px;
+}
+
+.timeline-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #00f0ff;
+  box-shadow: 0 0 10px rgba(0,240,255,0.6);
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #050505;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 240, 255, 0.2);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 240, 255, 0.4);
+}
+
+/* Base custom classes to align with templates */
+.tech-pill {
+  background: rgba(0,240,255,0.1);
+  border: 1px solid rgba(0,240,255,0.3);
+  color: #00dbe9;
+}
+
+.tech-pill-violet {
+  background: rgba(112,0,255,0.1);
+  border: 1px solid rgba(112,0,255,0.3);
+  color: #d1bcff;
+}
+
+.laser-line {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,240,255,0.8), transparent);
+}
+
+.text-glow {
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+}
+
+/* Active navigation indicator */
+.active-section-indicator {
+  position: fixed;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60px;
+  background: linear-gradient(to bottom, transparent, #00f0ff, transparent);
+  z-index: 40;
+}
+
+[dir="rtl"] .active-section-indicator {
+  left: auto;
+  right: 0;
+}
