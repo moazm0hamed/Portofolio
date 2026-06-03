@@ -124,6 +124,11 @@ export default function App() {
     }
   };
 
+  // Programmatic robust PDF download handler
+  const handleDownloadCv = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    triggerBeep(1000, 0.15);
+  };
+
   // 3D Avatar Tilt Logic
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!avatarRef.current) return;
@@ -813,8 +818,10 @@ export default function App() {
                         {t.contactBtn}
                       </button>
                       <a
-                        href="#download-cv"
-                        onClick={(e) => { e.preventDefault(); triggerBeep(1200, 0.1); alert('Security system verification successful. Loading CV attachment dynamic link.'); }}
+                        href="https://drive.google.com/file/d/1UTNlwK20mThp_NDs-9fXzLl_vJlfYM2k/view?usp=drive_link"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={handleDownloadCv}
                         className="flex-1 glass-panel text-[#00dbe9] border border-[#00dbe9]/30 font-mono text-xs font-bold py-3 rounded uppercase hover:bg-white/5 active:scale-95 transition-all duration-300 text-center"
                       >
                         {t.downloadCvBtn}
