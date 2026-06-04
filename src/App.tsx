@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useScroll, useSpring } from 'motion/react';
 import { translations } from './translations';
 import { projectsData, certificatesData } from './data';
 import { ActiveTab, Language } from './types';
@@ -19,6 +19,23 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('home');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+
+  // Scroll Animations system state
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const { scrollYProgress } = useScroll();
+  const scaleX = useSpring(scrollYProgress, { stiffness: 100, damping: 30, restDelta: 0.001 });
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 300) {
+        setShowScrollTop(true);
+      } else {
+        setShowScrollTop(false);
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
   
   // Custom Settings state
   const [soundEnabled, setSoundEnabled] = useState(true);
@@ -477,6 +494,24 @@ export default function App() {
   return (
     <div className="bg-[#050505] text-[#e3e2e2] min-h-screen flex flex-col relative overflow-x-hidden font-sans">
       
+      {/* Dynamic Cybernetic Scroll Progress Indicator */}
+      <motion.div
+        className="fixed top-0 left-0 right-0 h-1 z-[999] origin-left"
+        style={{
+          scaleX,
+          background: accentColor === 'violet' 
+            ? 'linear-gradient(90deg, #7000ff, #d1bcff)' 
+            : accentColor === 'emerald' 
+            ? 'linear-gradient(90deg, #00e395, #00f5ab)' 
+            : 'linear-gradient(90deg, #028090, #00dbe9)',
+          boxShadow: accentColor === 'violet' 
+            ? '0 0 15px #7000ff, 0 0 5px #d1bcff' 
+            : accentColor === 'emerald' 
+            ? '0 0 15px #00e395, 0 0 5px #00f5ab' 
+            : '0 0 15px #00dbe9, 0 0 5px #00dbe9'
+        }}
+      />
+      
       {/* 3D grid and streaming visual effects */}
       <div className="fixed inset-0 bg-grid z-0 pointer-events-none opacity-90" />
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
@@ -830,7 +865,13 @@ export default function App() {
                   </div>
 
                   {/* Operational statistics cards */}
-                  <div className="grid grid-cols-3 gap-3">
+                  <motion.div
+                    initial={{ opacity: 0, y: 35 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: "-50px" }}
+                    transition={{ duration: 0.6 }}
+                    className="grid grid-cols-3 gap-3"
+                  >
                     <div className="glass-panel rounded-xl p-4 text-center">
                       <div className={`text-3xl font-black ${getPrimaryTextColor()}`}>
                         <AnimatedCounter target={2} suffix="+" delay={100} duration={1000} />
@@ -855,14 +896,20 @@ export default function App() {
                         {t.certsLabel}
                       </div>
                     </div>
-                  </div>
+                  </motion.div>
                 </div>
 
                 {/* Right side system profile & timeline details */}
                 <div className="md:col-span-8 space-y-6">
                   
                   {/* Mission Statement panel */}
-                  <div className="glass-panel rounded-xl p-6 md:p-8">
+                  <motion.div
+                    initial={{ opacity: 0, x: 40 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true, margin: "-60px" }}
+                    transition={{ duration: 0.65, ease: "easeOut" }}
+                    className="glass-panel rounded-xl p-6 md:p-8"
+                  >
                     <div className="flex items-center gap-2 mb-4 font-mono text-xs text-primary-container">
                       <span className={getPrimaryTextColor()}>{t.missionSys}</span>
                     </div>
@@ -875,9 +922,16 @@ export default function App() {
                     <p className="text-base text-on-surface-variant leading-relaxed">
                       {t.missionP2}
                     </p>
-                  </div>
+                  </motion.div>
 
-                              <div className="glass-panel rounded-xl p-6 md:p-8">
+                  {/* Career Timeline panel */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 45 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: "-100px" }}
+                    transition={{ duration: 0.7 }}
+                    className="glass-panel rounded-xl p-6 md:p-8"
+                  >
                     <div className="flex items-center gap-2 mb-8 font-mono text-xs text-primary-container">
                       <span className="material-symbols-outlined text-md">timeline</span>
                       <span className={getPrimaryTextColor()}>{t.timelineSys}</span>
@@ -906,7 +960,14 @@ export default function App() {
                           color: '#d1bcff'
                         }
                       ].map((item, idx) => (
-                        <div key={idx} className="relative flex flex-col gap-2">
+                        <motion.div
+                          key={idx}
+                          initial={{ opacity: 0, x: lang === 'ar' ? 30 : -30 }}
+                          whileInView={{ opacity: 1, x: 0 }}
+                          viewport={{ once: true, margin: "-50px" }}
+                          transition={{ duration: 0.52, delay: idx * 0.18 }}
+                          className="relative flex flex-col gap-2"
+                        >
                           {/* Indicator code dot */}
                           <div
                             className="absolute -left-[30px] rtl:-right-[30px] timeline-dot"
@@ -925,13 +986,19 @@ export default function App() {
                           </div>
                           <h4 className="text-lg font-bold text-white">{item.title}</h4>
                           <p className="text-sm text-on-surface-variant max-w-xl">{item.desc}</p>
-                        </div>
+                        </motion.div>
                       ))}
                     </div>
-                  </div>
+                  </motion.div>
 
                   {/* Bottom section CTA */}
-                  <div className="glass-panel rounded-xl p-6 md:p-8 flex flex-col sm:flex-row items-center justify-between gap-6 relative overflow-hidden">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    whileInView={{ opacity: 1, scale: 1 }}
+                    viewport={{ once: true, margin: "-50px" }}
+                    transition={{ duration: 0.5 }}
+                    className="glass-panel rounded-xl p-6 md:p-8 flex flex-col sm:flex-row items-center justify-between gap-6 relative overflow-hidden"
+                  >
                     <div className="space-y-1">
                       <h4 className="text-xl font-bold text-white">{t.readyHeading}</h4>
                       <p className="text-sm text-on-surface-variant">{t.readyDesc}</p>
@@ -942,7 +1009,7 @@ export default function App() {
                     >
                       {t.initiateBtn}
                     </button>
-                  </div>
+                  </motion.div>
 
                 </div>
 
@@ -965,7 +1032,13 @@ export default function App() {
                 </div>
 
                 {/* Immersive 3-card project mesh layout */}
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-8 w-full max-w-6xl relative z-25 items-stretch transition-all duration-500">
+                <motion.div
+                  initial={{ opacity: 0, y: 55 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-100px" }}
+                  transition={{ duration: 0.75, ease: "easeOut" }}
+                  className="grid grid-cols-1 md:grid-cols-12 gap-8 w-full max-w-6xl relative z-25 items-stretch transition-all duration-500"
+                >
                   
                   {/* Left Column: PS System Emulation */}
                   <motion.div 
@@ -1259,7 +1332,7 @@ export default function App() {
                     </div>
                   </motion.div>
 
-                </div>
+                </motion.div>
 
                 {/* Simulated interactive HUD server console for horror logs */}
                 <AnimatePresence>
@@ -1443,7 +1516,8 @@ export default function App() {
                             <div className="h-1 bg-white/10 rounded-full overflow-hidden">
                               <motion.div
                                 initial={{ width: 0 }}
-                                animate={{ width: s_item.pct }}
+                                whileInView={{ width: s_item.pct }}
+                                viewport={{ once: true }}
                                 transition={{ duration: 1.2, ease: 'easeInOut' }}
                                 className={`h-full ${getPrimaryBgColor()}`}
                               />
@@ -1465,7 +1539,13 @@ export default function App() {
 
                       <div className="pt-6">
                         <div className="h-1 bg-white/5 rounded-full overflow-hidden mb-4">
-                          <div className={`rounded-full ${getPrimaryBgColor()}`} style={{ width: '98.28%', height: '100%' }} />
+                          <motion.div
+                            initial={{ width: 0 }}
+                            whileInView={{ width: '98.28%' }}
+                            viewport={{ once: true }}
+                            transition={{ duration: 1.5, ease: 'easeOut' }}
+                            className={`rounded-full h-full ${getPrimaryBgColor()}`}
+                          />
                         </div>
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-lg bg-primary-container/10 border border-primary-container/20 flex items-center justify-center">
@@ -1536,13 +1616,17 @@ export default function App() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {certificatesData.map((cert) => {
+                    {certificatesData.map((cert, idx) => {
                       const isDecrypted = decryptedCerts[cert.id];
                       const isProcessing = decryptingId === cert.id;
 
                       return (
-                        <div
+                        <motion.div
                           key={cert.id}
+                          initial={{ opacity: 0, y: 30 }}
+                          whileInView={{ opacity: 1, y: 0 }}
+                          viewport={{ once: true, margin: "-40px" }}
+                          transition={{ duration: 0.5, delay: idx * 0.12 }}
                           onClick={() => handleDecryptCert(cert.id)}
                           className={`glass-panel rounded-xl p-6 border transition-all duration-300 relative select-none cursor-pointer overflow-hidden ${
                             isDecrypted 
@@ -1648,7 +1732,7 @@ export default function App() {
                               {isProcessing ? t.transmittingBtn : isDecrypted ? t.decrypted : t.hoverDecrypt}
                             </span>
                           </div>
-                        </div>
+                        </motion.div>
                       );
                     })}
                   </div>
@@ -1663,7 +1747,13 @@ export default function App() {
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
                   
                   {/* Left side terminal visual about logs */}
-                  <div className="md:col-span-4">
+                  <motion.div
+                    initial={{ opacity: 0, x: -40 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true, margin: "-100px" }}
+                    transition={{ duration: 0.65, ease: 'easeOut' }}
+                    className="md:col-span-4"
+                  >
                     
                     {/* SYS.ABOUT.LOG card */}
                     <div className="glass-panel rounded-xl p-6 bg-surface-lowest flex flex-col relative overflow-hidden h-fit">
@@ -1766,10 +1856,16 @@ export default function App() {
                       </div>
                     </div>
 
-                  </div>
+                  </motion.div>
 
                   {/* Right side secure communications link contact form representation */}
-                  <div className="md:col-span-8">
+                  <motion.div
+                    initial={{ opacity: 0, x: 40 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true, margin: "-100px" }}
+                    transition={{ duration: 0.65, ease: 'easeOut' }}
+                    className="md:col-span-8"
+                  >
                     <div className="glass-panel rounded-xl p-8 md:p-10 relative">
                       
                       {/* Retro corner tags decorations */}
@@ -1880,7 +1976,7 @@ export default function App() {
                       </form>
 
                     </div>
-                  </div>
+                  </motion.div>
 
                 </div>
 
@@ -2290,6 +2386,43 @@ export default function App() {
           />
         ))}
       </div>
+
+      {/* Futuristic Scroll-to-Top HUD Button */}
+      <AnimatePresence>
+        {showScrollTop && (
+          <motion.button
+            initial={{ opacity: 0, y: 30, scale: 0.8 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 30, scale: 0.8 }}
+            whileHover={{ scale: 1.08, translateY: -3 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => {
+              triggerBeep(1200, 0.1);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className={`fixed bottom-8 right-8 z-[100] w-12 h-12 rounded-lg glass-panel flex items-center justify-center border cursor-pointer group shadow-lg transition-all ${
+              accentColor === 'violet' 
+                ? 'border-[#7000ff]/60 text-[#d1bcff] hover:bg-[#7000ff]/20 hover:border-[#7000ff]' 
+                : accentColor === 'emerald' 
+                ? 'border-[#00e395]/60 text-[#00f5ab] hover:bg-[#00e395]/20 hover:border-[#00e395]' 
+                : 'border-[#00f0ff]/65 text-[#00f0ff] hover:bg-[#00f0ff]/20 hover:border-[#00f0ff]'
+            }`}
+            style={{
+              boxShadow: accentColor === 'violet'
+                ? '0 0 15px rgba(112,0,255,0.4)'
+                : accentColor === 'emerald'
+                ? '0 0 15px rgba(0,227,149,0.4)'
+                : '0 0 15px rgba(0,240,255,0.4)',
+              backdropFilter: 'blur(8px)'
+            }}
+            title={lang === 'en' ? 'SCROLL TO TOP' : 'الرجوع للأعلى'}
+          >
+            <span className="material-symbols-outlined text-2xl font-bold group-hover:-translate-y-0.5 transition-transform">
+              arrow_upward
+            </span>
+          </motion.button>
+        )}
+      </AnimatePresence>
 
     </div>
   );
