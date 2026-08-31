@@ -1,6 +1,6 @@
 export type Language = 'en' | 'ar';
 
-export type ActiveTab = 'home' | 'about' | 'projects' | 'skills' | 'contact';
+export type ActiveTab = 'home' | 'about' | 'projects' | 'certificates' | 'contact';
 
 export interface TranslationSet {
   navHome: string;
@@ -10,6 +10,8 @@ export interface TranslationSet {
   navSkills: string;
   navContact: string;
   role: string;
+  heroTitle: string;
+  heroSupporting: string;
   firstName: string;
   lastName: string;
   bio: string;
@@ -63,6 +65,7 @@ export interface TranslationSet {
   encryptedVault: string;
   recordsCount: string;
   hoverDecrypt: string;
+  viewCertificate: string;
   decrypted: string;
 
   // Contact
@@ -81,6 +84,7 @@ export interface TranslationSet {
   transmittingBtn: string;
   transmittedBtn: string;
   toastSuccess: string;
+  toastError: string;
   commChannels: string;
   commChannelsSub: string;
   linkedinLabel: string;
@@ -105,6 +109,7 @@ export interface CertificateData {
   issuer: string;
   date: string;
   icon: string;
+  verificationUrl?: string;
   colorClass: string;
   duration?: string;
   score?: string;

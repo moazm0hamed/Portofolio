@@ -1,17 +1,18 @@
 import * as React from 'react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence, useScroll, useSpring } from 'motion/react';
 import { translations } from './translations';
-import { projectsData, certificatesData } from './data';
+import { certificatesData } from './data';
 import { ActiveTab, Language } from './types';
-import HorasSimulator from './components/HorasSimulator';
 import AnimatedCounter from './components/AnimatedCounter';
 import Typewriter from './components/Typewriter';
+import ProjectCard from './components/ProjectCard';
+import { useDialogFocus } from './hooks/useDialogFocus';
+import { projectFilters, projects, type ProjectCategory, type ProjectId } from './projectData';
 
-import psSystemMockup from './assets/images/ps_system_mockup_1780460973153.png';
-import horasErpMockup from './assets/images/horas_erp_mockup_1780456782429.png';
-import horasShopMockup from './assets/images/horas_shop_mockup_1780461267914.png';
-import developerLogo from './assets/images/developer_logo_1780506584453.png';
+import developerLogo from './assets/images/developer_logo_1780506584453.webp';
+
+const sectionIds: ActiveTab[] = ['home', 'about', 'projects', 'certificates', 'contact'];
 
 export default function App() {
   // State variables
@@ -33,7 +34,7 @@ export default function App() {
         setShowScrollTop(false);
       }
     };
-    window.addEventListener('scroll', handleScroll);
+    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
   
@@ -41,7 +42,6 @@ export default function App() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [accentColor, setAccentColor] = useState<'cyan' | 'violet' | 'emerald'>('cyan');
   const [glowIntensity, setGlowIntensity] = useState<'low' | 'medium' | 'high'>('medium');
-  const [terminalActive, setTerminalActive] = useState(true);
 
   // Interaction logs / state engines
   const [decryptedCerts, setDecryptedCerts] = useState<Record<string, boolean>>({});
@@ -51,26 +51,10 @@ export default function App() {
   const [flareTrigger, setFlareTrigger] = useState(false);
   const [shards, setShards] = useState<Array<{ id: number; x: number; y: number; s: number; color: string }>>([]);
   
-  // HORAS ERP Logs Simulator
-  const [showHorasLogs, setShowHorasLogs] = useState(false);
-  const [horasLogs, setHorasLogs] = useState<string[]>([]);
-  const [horasDeploying, setHorasDeploying] = useState(false);
-  const [horasProgress, setHorasProgress] = useState(0);
-  const [showHorasSimulator, setShowHorasSimulator] = useState(false);
-  
-  // PS Simulator state
-  const [showPsLogs, setShowPsLogs] = useState(false);
-  const [psLogs, setPsLogs] = useState<string[]>([]);
-  const [psDeploying, setPsDeploying] = useState(false);
-  const [psProgress, setPsProgress] = useState(0);
-
   // Shop Simulator state
   const [showShopLogs, setShowShopLogs] = useState(false);
   const [shopLogs, setShopLogs] = useState<string[]>([]);
-  const [shopDeploying, setShopDeploying] = useState(false);
-  const [shopProgress, setShopProgress] = useState(0);
-
-  const [hoveredProject, setHoveredProject] = useState<number | null>(null);
+  const [projectFilter, setProjectFilter] = useState<ProjectCategory>('all');
 
   // Form payload handling
   const [nameVal, setNameVal] = useState('');
@@ -80,7 +64,7 @@ export default function App() {
   
   const [transmitting, setTransmitting] = useState(false);
   const [transmitted, setTransmitted] = useState(false);
-  const [showToast, setShowToast] = useState(false);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [sysLogs, setSysLogs] = useState<string[]>([
     '> INITIATING QUERY: USER_PROFILE',
     '> [OK] DATA STREAM SECURED.',
@@ -90,7 +74,29 @@ export default function App() {
   ]);
 
   const avatarRef = useRef<HTMLDivElement>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
+  const settingsDialogRef = useRef<HTMLDivElement>(null);
+  const shopLogsDialogRef = useRef<HTMLDivElement>(null);
   const t = translations[lang];
+  const cvUrl = `${import.meta.env.BASE_URL}cv/Moaz_Mohamed_CV.pdf`;
+
+  const closeSettings = useCallback(() => setShowSettings(false), []);
+  const closeShopLogs = useCallback(() => setShowShopLogs(false), []);
+
+  useDialogFocus(showSettings, closeSettings, settingsDialogRef);
+  useDialogFocus(showShopLogs, closeShopLogs, shopLogsDialogRef);
+
+  const showToastMessage = useCallback((message: string, type: 'success' | 'error' = 'success') => {
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+    setToast({ type, message });
+    toastTimerRef.current = window.setTimeout(() => setToast(null), 4500);
+  }, []);
+
+  useEffect(() => () => {
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
+    void audioContextRef.current?.close();
+  }, []);
 
   // Sync index.html attributes for RTL support and theme settings
   useEffect(() => {
@@ -121,7 +127,8 @@ export default function App() {
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioCtx) return;
-      const ctx = new AudioCtx();
+      const ctx = audioContextRef.current ?? new AudioCtx();
+      audioContextRef.current = ctx;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       
@@ -189,12 +196,23 @@ export default function App() {
     setTimeout(() => setShards([]), 1200);
   };
 
-  // Standard tab trigger with action logs and sounds
+  // Same-page section navigation with action logs and sounds
   const handleTabChange = (tab: ActiveTab) => {
     triggerBeep(880, 0.06);
     triggerBurst();
     setActiveTab(tab);
     setMobileMenuOpen(false);
+
+    const section = document.getElementById(tab);
+    if (section) {
+      window.history.pushState(null, '', `#${tab}`);
+      window.setTimeout(() => {
+        section.scrollIntoView({
+          behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+          block: 'start'
+        });
+      }, mobileMenuOpen ? 350 : 0);
+    }
 
     // Dynamic terminal append
     if (tab !== 'home') {
@@ -206,6 +224,50 @@ export default function App() {
       ].slice(-10));
     }
   };
+
+  useEffect(() => {
+    const scrollToHash = () => {
+      const requestedSection = window.location.hash.slice(1) as ActiveTab;
+      if (!sectionIds.includes(requestedSection)) return;
+
+      setActiveTab(requestedSection);
+      window.requestAnimationFrame(() => {
+        document.getElementById(requestedSection)?.scrollIntoView({ behavior: 'auto', block: 'start' });
+      });
+    };
+
+    scrollToHash();
+    const initialHashTimer = window.setTimeout(scrollToHash, 150);
+    window.addEventListener('load', scrollToHash);
+    window.addEventListener('hashchange', scrollToHash);
+    window.addEventListener('popstate', scrollToHash);
+    return () => {
+      window.clearTimeout(initialHashTimer);
+      window.removeEventListener('load', scrollToHash);
+      window.removeEventListener('hashchange', scrollToHash);
+      window.removeEventListener('popstate', scrollToHash);
+    };
+  }, []);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => {
+      const visibleSection = entries
+        .filter((entry) => entry.isIntersecting)
+        .sort((a, b) => Math.abs(a.boundingClientRect.top - 80) - Math.abs(b.boundingClientRect.top - 80))[0];
+
+      if (visibleSection) setActiveTab(visibleSection.target.id as ActiveTab);
+    }, {
+      rootMargin: '-80px 0px -55% 0px',
+      threshold: 0
+    });
+
+    sectionIds.forEach((id) => {
+      const section = document.getElementById(id);
+      if (section) observer.observe(section);
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   // Decryption simulation
   const handleDecryptCert = (certId: string) => {
@@ -227,116 +289,20 @@ export default function App() {
     }, 150);
   };
 
-  // HORAS ERP Logs Streamer
-  const handleShowLogs = () => {
-    triggerBeep(600, 0.1);
-    setShowHorasLogs(true);
-    setHorasLogs(['> CONNECTING TO HORAS HOST DEPLOYER_PORT...']);
-    
-    const logs = [
-      '// STANDBY: ENCRYPTED HANDSHAKE... SECURED',
-      '// LOADING METALS AND LOGISTICAL GRAPH V1.0',
-      '// SQL CONNECTION POOL ESTABLISHED AT host_postgresql_99',
-      '// WebGL CANVAS RENDER ENGINE: STATUS RUNNING',
-      '// COGNITIVE METRIC ANALYZERS: CALIBRATED',
-      '// CORE INTEGRITY LOGIC SYNC COMPLETED SUCCESSFULLY.',
-      '// SYSTEMS IN STANDBY MATRIX. PORT 3000 INGRESS STABLE.'
-    ];
-
-    logs.forEach((logLine, index) => {
-      setTimeout(() => {
-        setHorasLogs(prev => [...prev, logLine]);
-        triggerBeep(700 + index * 50, 0.03);
-      }, (index + 1) * 350);
-    });
-  };
-
-  // HORAS ERP Deployer simulation
-  const handleDeployInstance = () => {
-    if (horasDeploying) return;
-    triggerBeep(1000, 0.2, 'triangle');
-    setHorasDeploying(true);
-    setHorasProgress(0);
-
-    const interval = setInterval(() => {
-      setHorasProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-            setHorasDeploying(false);
-            triggerBeep(1300, 0.25);
-            setShowHorasSimulator(true);
-          }, 300);
-          return 100;
-        }
-        triggerBeep(400 + prev * 6, 0.03, 'square');
-        return prev + 10;
-      });
-    }, 180);
-  };
-
-  // PS Logs Streamer
-  const handleShowPsLogs = () => {
-    triggerBeep(600, 0.1);
-    setShowPsLogs(true);
-    setPsLogs(['> CONNECTING TO PS_MANAGEMENT NODE CLIENT (IP: 192.168.1.110)...']);
-    
-    const logs = [
-      '// STANDBY: ENCRYPTED HANDSHAKE... SECURED',
-      '// DETECTING PS5 SYSTEM HOST DEPLOYMENT ON RESERVED NODE...',
-      '// SQL STATUS: CLIENTS DATA MATRIX READY',
-      '// INTEGRATED AUTOMATIC BILLING BOT ACTIVE ON TELEGRAM WEBHOOK',
-      '// AUDIO FEEDBACK COMPILERS PREPARED',
-      '// RESERVATION CALIBRATION: FULLY SECURED',
-      '// ALL REVENUE ANALYZERS SECURED // systems green'
-    ];
-
-    logs.forEach((logLine, index) => {
-      setTimeout(() => {
-        setPsLogs(prev => [...prev, logLine]);
-        triggerBeep(700 + index * 50, 0.03);
-      }, (index + 1) * 350);
-    });
-  };
-
-  // PS Deployer Simulation
-  const handleDeployPs = () => {
-    if (psDeploying) return;
-    triggerBeep(1000, 0.2, 'triangle');
-    setPsDeploying(true);
-    setPsProgress(0);
-
-    const interval = setInterval(() => {
-      setPsProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-            setPsDeploying(false);
-            triggerBeep(1300, 0.25);
-            alert(lang === 'en' ? 'PlayStation Management System compiled and launched successfully!' : 'تم تجميع وتثبيت نظام إدارة البلايستيشن بنجاح!');
-          }, 300);
-          return 100;
-        }
-        triggerBeep(400 + prev * 6, 0.03, 'square');
-        return prev + 10;
-      });
-    }, 180);
-  };
-
   // Shop Logs Streamer
   const handleShowShopLogs = () => {
     triggerBeep(600, 0.1);
     setShowShopLogs(true);
-    setShopLogs(['> CONNECTING TO HORAS_SHOP CLOUD SERVER DOMAIN FOR DEPLOY...']);
+    setShopLogs(['> CONNECTING TO HORAS_STORE PRODUCTION NODE...']);
     
     const logs = [
-      '// STANDBY: ESTABLISHING RE-ROUTING TO HIGH-PERFORMANCE NETWORKS',
-      '// CHECKOUT SSL SYNC CHECK INITIATED on port 443',
-      '// LOCAL STORAGE CACHE SYSTEMS REDISTRIBUTING SKU ENTRIES',
-      '// OPTIMIZING SECURED IMAGES RESOURCE CACHE FOR DEPLOYMENT',
-      '// BOOTSTRAP RESIDUE CLEARING COMPLETED SUCCESSFULLY',
-      '// METRIC ANALYZERS CAPTURING CUSTOMER CONVERSION RATES',
-      '// DEPLOY MATRIX HEALTH CHECKS: NOMINAL (99.8% READY)'
+      '// FRONTEND: NEXT.JS 16 APP ROUTER + REACT 19 + TYPESCRIPT',
+      '// DATA LAYER: PRISMA ORM CONNECTED TO NEON POSTGRESQL',
+      '// ADMIN AUTH: BCRYPTJS + JOSE SIGNED COOKIE SESSIONS',
+      '// MEDIA PIPELINE: NEXT/IMAGE + VERCEL BLOB STORAGE',
+      '// COMMERCE FLOW: CASH ON DELIVERY ORDERS PERSISTED',
+      '// ADMIN MATRIX: PRODUCTS / ORDERS / STOCK / CUSTOMERS ONLINE',
+      '// PRODUCTION ENDPOINT: HORAS-STORE.VERCEL.APP [LIVE]'
     ];
 
     logs.forEach((logLine, index) => {
@@ -347,28 +313,8 @@ export default function App() {
     });
   };
 
-  // Shop Deployer Simulation
-  const handleDeployShop = () => {
-    if (shopDeploying) return;
-    triggerBeep(1000, 0.2, 'triangle');
-    setShopDeploying(true);
-    setShopProgress(0);
-
-    const interval = setInterval(() => {
-      setShopProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-            setShopDeploying(false);
-            triggerBeep(1300, 0.25);
-            alert(lang === 'en' ? 'Horas Shop Node compiled and active on Cloud Web Gateway!' : 'تم تجميع برمجيات متجر هوراس والمزامنة مع البوابة السحابية بنجاح!');
-          }, 300);
-          return 100;
-        }
-        triggerBeep(400 + prev * 6, 0.03, 'square');
-        return prev + 10;
-      });
-    }, 180);
+  const handleProjectLogs = (projectId: ProjectId) => {
+    if (projectId === 'horas-store') handleShowShopLogs();
   };
 
   // Form payload submission
@@ -381,8 +327,8 @@ export default function App() {
     
     // Simulate diagnostic terminal stream
     const logsStream = [
-      `> PACKAGING DATA_PAYLOAD FOR DESIGNATION: ${nameVal}`,
-      `> ENCRYPTING PARAMS (AES-256) WITH FREQUENCY: ${emailVal}`,
+      `> PREPARING MESSAGE FROM: ${nameVal}`,
+      `> VALIDATING CONTACT DETAILS FOR: ${emailVal}`,
       `> BROADCASTING PROTOCOL ON CHANNEL SUBJECT: ${subVal || 'N/A'}`,
       `> INIT Real-Time Mail Gateway dispatch...`
     ];
@@ -410,52 +356,41 @@ export default function App() {
         })
       });
 
-      if (response.ok) {
-        setSysLogs(prev => [
-          ...prev,
-          `> MAIL SECURED. METRIC ROUTED TO TARGET GATEWAY.`
-        ].slice(-10));
-      } else {
-        setSysLogs(prev => [
-          ...prev,
-          `> GATEWAY REJECTION DETECTED // METRIC PIPED LOCALLY.`
-        ].slice(-10));
+      if (!response.ok) {
+        throw new Error(`Contact gateway rejected the request with status ${response.status}`);
       }
-    } catch (err) {
-      console.error("Transmission failed", err);
+
       setSysLogs(prev => [
         ...prev,
-        `> NETWORK LINK TIMEOUT // FAULT HANDLED.`
+        `> MAIL SECURED. METRIC ROUTED TO TARGET GATEWAY.`
       ].slice(-10));
-    }
 
-    setTimeout(() => {
-      setTransmitting(false);
+      await new Promise(resolve => window.setTimeout(resolve, 1500));
       setTransmitted(true);
-      setShowToast(true);
+      showToastMessage(t.toastSuccess);
       triggerBeep(1400, 0.3);
 
-      // Reset values
       setNameVal('');
       setEmailVal('');
       setSubVal('');
       setMsgVal('');
 
-      // Auto clear toaster
-      setTimeout(() => {
-        setShowToast(false);
-      }, 4000);
-
-      setTimeout(() => {
-        setTransmitted(false);
-      }, 3000);
-
+      window.setTimeout(() => setTransmitted(false), 3000);
       setSysLogs(prev => [
         ...prev,
         `> SUCCESS: INCOMING MESSAGE MATRIX TRANSLATED AND FILED.`,
         `> TERMINAL IDLE. MONITORING LOCAL SYSTEM INTENT.`
       ].slice(-15));
-    }, 1500);
+    } catch (err) {
+      console.error("Transmission failed", err instanceof Error ? err.message : 'Unknown error');
+      setSysLogs(prev => [
+        ...prev,
+        `> NETWORK LINK TIMEOUT // FAULT HANDLED.`
+      ].slice(-10));
+      showToastMessage(t.toastError, 'error');
+    } finally {
+      setTransmitting(false);
+    }
   };
 
   // Get accent coloring classes (Cyan, Violet, Emerald)
@@ -568,23 +503,28 @@ export default function App() {
             id="brand-logo"
           >
             <div className="w-8 h-8 rounded-full border border-primary-container/30 overflow-hidden bg-white/5 active-glow-shadow flex items-center justify-center shrink-0">
-              <img src={developerLogo} alt="Moaz Mohamed" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              <img src={developerLogo} alt="" aria-hidden="true" width={1408} height={768} decoding="async" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             </div>
             <span>Moaz Mohamed</span>
           </a>
 
           {/* Desktop Nav */}
-          <div className="hidden md:flex gap-8 font-mono text-xs font-bold uppercase tracking-widest">
+          <div className="hidden lg:flex gap-8 font-mono text-xs font-bold uppercase tracking-widest">
             {[
               { id: 'home', label: t.navHome },
               { id: 'about', label: t.navAbout },
               { id: 'projects', label: t.navProjects },
-              { id: 'skills', label: t.navCertifications },
+              { id: 'certificates', label: t.navCertifications },
               { id: 'contact', label: t.navContact }
             ].map((tab) => (
               <a
                 key={tab.id}
-                onClick={() => handleTabChange(tab.id as ActiveTab)}
+                href={`#${tab.id}`}
+                onClick={(event) => {
+                  event.preventDefault();
+                  handleTabChange(tab.id as ActiveTab);
+                }}
+                aria-current={activeTab === tab.id ? 'page' : undefined}
                 className={`relative cursor-pointer transition-all duration-300 py-2 ${
                   activeTab === tab.id
                     ? `${getPrimaryTextColor()} font-black`
@@ -638,8 +578,10 @@ export default function App() {
                 triggerBeep(800, 0.05);
                 setMobileMenuOpen(prev => !prev);
               }}
-              className="md:hidden text-on-surface-variant hover:text-white transition-colors cursor-pointer"
+              className="lg:hidden text-on-surface-variant hover:text-white transition-colors cursor-pointer"
               aria-label="Menu"
+              aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-overlay"
               id="hamburger-btn"
             >
               <span className="material-symbols-outlined text-2xl">
@@ -656,20 +598,25 @@ export default function App() {
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="absolute left-0 right-0 top-20 bg-surface-dim/95 backdrop-blur-2xl border-t border-white/10 px-6 py-6 md:hidden flex flex-col space-y-4 font-mono text-xs uppercase tracking-wider"
+              className="absolute left-0 right-0 top-20 bg-surface-dim/95 backdrop-blur-2xl border-t border-white/10 px-6 py-6 lg:hidden flex flex-col space-y-4 font-mono text-xs uppercase tracking-wider"
               id="mobile-overlay"
             >
               {[
                 { id: 'home', label: t.navHome },
                 { id: 'about', label: t.navAbout },
                 { id: 'projects', label: t.navProjects },
-                { id: 'skills', label: t.navCertifications },
+                { id: 'certificates', label: t.navCertifications },
                 { id: 'contact', label: t.navContact }
               ].map((tab) => (
                 <a
                   key={tab.id}
-                  onClick={() => handleTabChange(tab.id as ActiveTab)}
-                  className={`block py-2 ${
+                  href={`#${tab.id}`}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    handleTabChange(tab.id as ActiveTab);
+                  }}
+                  aria-current={activeTab === tab.id ? 'page' : undefined}
+                  className={`block w-full text-left rtl:text-right py-2 ${
                     activeTab === tab.id ? `${getPrimaryTextColor()} font-black` : 'text-on-surface-variant'
                   }`}
                 >
@@ -683,18 +630,8 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-grow z-10 pt-28 pb-20 px-4 md:px-10 max-w-[1440px] mx-auto w-full">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -15 }}
-            transition={{ duration: 0.35, ease: 'easeOut' }}
-            className="w-full"
-          >
             {/* ────── VIEW 1: HOME ────── */}
-            {activeTab === 'home' && (
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-10 items-center py-10 min-h-[calc(100vh-200px)]">
+              <section id="home" className="grid grid-cols-1 md:grid-cols-12 gap-10 items-center py-10 min-h-[calc(100vh-200px)] scroll-mt-32">
                 
                 {/* Left side bio contents */}
                 <div className="md:col-span-6 space-y-8 flex flex-col justify-center">
@@ -706,21 +643,14 @@ export default function App() {
                   </div>
 
                   <div className="space-y-4">
-                    <h1 className="text-4xl md:text-6xl font-black tracking-tighter uppercase text-white leading-none">
-                      {lang === 'en' ? (
-                        <>
-                          {t.firstName} <br />
-                          <span className={getPrimaryTextColor()}>{t.lastName}</span>
-                        </>
-                      ) : (
-                        <>
-                          <span className={getPrimaryTextColor()}>{t.firstName}</span> <br />
-                          {t.lastName}
-                        </>
-                      )}
+                    <h1 className="whitespace-pre-line text-4xl md:text-6xl font-black tracking-tighter uppercase text-white leading-none">
+                      <span className={getPrimaryTextColor()}>{t.heroTitle}</span>
                     </h1>
                     <p className="text-base md:text-lg text-on-surface-variant max-w-lg leading-relaxed font-sans">
                       {t.bio}
+                    </p>
+                    <p className="text-sm text-on-surface-variant/80 max-w-lg leading-relaxed font-sans">
+                      {t.heroSupporting}
                     </p>
                   </div>
 
@@ -731,12 +661,16 @@ export default function App() {
                     >
                       {t.btnViewMatrix}
                     </button>
-                    <button
-                      onClick={() => handleTabChange('about')}
+                    <a
+                      href={cvUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download
+                      onClick={handleDownloadCv}
                       className="glass-panel text-on-surface font-mono text-xs font-bold uppercase px-8 py-4 rounded hover:bg-white/5 active:scale-95 transition-all duration-200 cursor-pointer border border-white/20"
                     >
                       {t.btnSystemAccess}
-                    </button>
+                    </a>
                   </div>
 
                   <div className="pt-6 flex items-center gap-4 text-on-surface-variant/70 font-mono text-xs uppercase" id="environmental-stats">
@@ -783,6 +717,10 @@ export default function App() {
                       <img
                         src="https://lh3.googleusercontent.com/aida-public/AB6AXuCP-rfb9bloWtfHi0-a9Zu8ahv9TWsfsNjDQMqRapoZhfJtrFo6wiu8g8WCBIUrbL2AaHFhdhQWFQk52aWnEriQMAOni1-yJscKxuzKIKMz7fgIJbosilA9fy3pgeKmDYtcgOblgWoSClHoyDI1Qc8xdjGaSbWv7SgujcH6egMv2wS2OkHcW5vvR7QXJ_dwUZktqF2UwfCqhIKzyxVcp79fuZn_3WLgfZBDHsYXzdGkE0jSlJsm5uxwvd1GGOgDWZkdqQ1XEDueC6A"
                         alt="3D Avatar of Moaz Mohamed"
+                        width={1408}
+                        height={768}
+                        fetchPriority="high"
+                        decoding="async"
                         className="w-full h-full object-cover rounded-lg filter drop-shadow-[0_0_20px_rgba(0,240,255,0.2)]"
                         referrerPolicy="no-referrer"
                       />
@@ -807,12 +745,10 @@ export default function App() {
                   </div>
                 </div>
 
-              </div>
-            )}
+              </section>
 
             {/* ────── VIEW 2: ABOUT ────── */}
-            {activeTab === 'about' && (
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start py-10">
+              <section id="about" className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start py-10 scroll-mt-32">
                 
                 {/* Left Card sidebar - profile card */}
                 <div className="md:col-span-4 space-y-6">
@@ -824,6 +760,10 @@ export default function App() {
                         <img
                           src="https://lh3.googleusercontent.com/aida-public/AB6AXuCP-rfb9bloWtfHi0-a9Zu8ahv9TWsfsNjDQMqRapoZhfJtrFo6wiu8g8WCBIUrbL2AaHFhdhQWFQk52aWnEriQMAOni1-yJscKxuzKIKMz7fgIJbosilA9fy3pgeKmDYtcgOblgWoSClHoyDI1Qc8xdjGaSbWv7SgujcH6egMv2wS2OkHcW5vvR7QXJ_dwUZktqF2UwfCqhIKzyxVcp79fuZn_3WLgfZBDHsYXzdGkE0jSlJsm5uxwvd1GGOgDWZkdqQ1XEDueC6A"
                           alt="Avatar profile"
+                          width={1408}
+                          height={768}
+                          loading="lazy"
+                          decoding="async"
                           className="w-full h-full object-cover rounded-full"
                           referrerPolicy="no-referrer"
                         />
@@ -853,7 +793,7 @@ export default function App() {
                         {t.contactBtn}
                       </button>
                       <a
-                        href="https://drive.google.com/file/d/1UTNlwK20mThp_NDs-9fXzLl_vJlfYM2k/view?usp=drive_link"
+                        href={cvUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         onClick={handleDownloadCv}
@@ -873,25 +813,19 @@ export default function App() {
                     className="grid grid-cols-3 gap-3"
                   >
                     <div className="glass-panel rounded-xl p-4 text-center">
-                      <div className={`text-3xl font-black ${getPrimaryTextColor()}`}>
-                        <AnimatedCounter target={2} suffix="+" delay={100} duration={1000} />
-                      </div>
+                      <div className={`text-lg font-black leading-tight ${getPrimaryTextColor()}`}>{lang === 'en' ? 'Responsive' : 'متجاوبة'}</div>
                       <div className="font-mono text-[10px] text-on-surface-variant uppercase mt-1">
                         {t.yearsLabel}
                       </div>
                     </div>
                     <div className="glass-panel rounded-xl p-4 text-center">
-                      <div className={`text-3xl font-black ${getPrimaryTextColor()}`}>
-                        <AnimatedCounter target={15} suffix="+" delay={250} duration={1200} />
-                      </div>
+                      <div className={`text-lg font-black leading-tight ${getPrimaryTextColor()}`}>{lang === 'en' ? 'Modern' : 'عصرية'}</div>
                       <div className="font-mono text-[10px] text-on-surface-variant uppercase mt-1">
                         {t.projectsLabel}
                       </div>
                     </div>
                     <div className="glass-panel rounded-xl p-4 text-center">
-                      <div className={`text-3xl font-black ${getPrimaryTextColor()}`}>
-                        <AnimatedCounter target={6} delay={400} duration={1400} />
-                      </div>
+                      <div className={`text-lg font-black leading-tight ${getPrimaryTextColor()}`}>{lang === 'en' ? 'Available' : 'متاح'}</div>
                       <div className="font-mono text-[10px] text-on-surface-variant uppercase mt-1">
                         {t.certsLabel}
                       </div>
@@ -913,9 +847,9 @@ export default function App() {
                     <div className="flex items-center gap-2 mb-4 font-mono text-xs text-primary-container">
                       <span className={getPrimaryTextColor()}>{t.missionSys}</span>
                     </div>
-                    <h3 className="text-3xl font-black text-white mb-4 tracking-tight leading-tight">
+                    <h2 className="text-3xl font-black text-white mb-4 tracking-tight leading-tight">
                       {t.missionHeading} <span className={getPrimaryTextColor()}>{t.missionHeadingHighlight}</span>
-                    </h3>
+                    </h2>
                     <p className="text-base text-on-surface-variant leading-relaxed mb-4">
                       {t.missionP1}
                     </p>
@@ -942,20 +876,20 @@ export default function App() {
 
                       {[
                         {
-                          year: 'May 2025 – May 2026',
-                          title: lang === 'en' ? 'Freelance Front-End Developer // Self-Employed' : 'مطوّر واجهات أمامية مستقِل // عمل حُر',
+                          year: 'May 2025 – Present',
+                          title: lang === 'en' ? 'Freelance Front-End Developer' : 'مطور واجهات أمامية مستقل',
                           desc: lang === 'en'
-                            ? 'Developed 10+ responsive high-performance interfaces using React.js and Tailwind, improving speed by 25%. Integrated Laravel backend systems and autonomous AI Agents.'
-                            : 'تطوير أكثر من ١٠ واجهات متجاوبة وعالية الأداء باستخدام React.js و Tailwind CSS، مع تحسين سرعات التحميل بنسبة ٢٥٪، وتكامل الأنظمة الخلفية مع وكلاء ذكاء اصطناعي.',
+                            ? 'Designed and developed responsive websites and web applications for clients using React, Next.js, TypeScript, and Tailwind CSS. Built reusable interfaces, integrated backend services, and optimized websites for desktop and mobile devices.'
+                            : 'صممت وطورت مواقع وتطبيقات ويب متجاوبة للعملاء باستخدام React وNext.js وTypeScript وTailwind CSS. أنشأت واجهات قابلة لإعادة الاستخدام، ودمجت خدمات الخلفية، وحسّنت المواقع لأجهزة الكمبيوتر والهواتف.',
                           badge: null,
                           color: '#00f0ff'
                         },
                         {
-                          year: 'Sept 2023 – Sept 2027',
+                          year: 'Sept 2023 – Expected 2027',
                           title: lang === 'en' ? 'Arab Open University // B.Sc. Computer Science' : 'الجامعة العربية المفتوحة // بكالوريوس علوم الحاسب',
                           desc: lang === 'en'
-                            ? 'Studying core computer science methodologies, software engineering, algorithms, and OOP. Mastering modern front-end tech independently while completing academic coursework.'
-                            : 'دراسة منهجيات علوم الحاسب الأساسية، هندسة البرمجيات، الخوارزميات، والبرمجة الكائنية OOP بالكامل، مع دراسة مستقلة لأحدث تقنيات الويب.',
+                            ? 'Studying computer science, software engineering, algorithms, object-oriented programming, and modern web development.'
+                            : 'أدرس علوم الحاسب وهندسة البرمجيات والخوارزميات والبرمجة كائنية التوجه وتطوير الويب الحديث.',
                           badge: t.activeStatus,
                           color: '#d1bcff'
                         }
@@ -984,7 +918,7 @@ export default function App() {
                               </span>
                             )}
                           </div>
-                          <h4 className="text-lg font-bold text-white">{item.title}</h4>
+                          <h3 className="text-lg font-bold text-white">{item.title}</h3>
                           <p className="text-sm text-on-surface-variant max-w-xl">{item.desc}</p>
                         </motion.div>
                       ))}
@@ -1000,7 +934,7 @@ export default function App() {
                     className="glass-panel rounded-xl p-6 md:p-8 flex flex-col sm:flex-row items-center justify-between gap-6 relative overflow-hidden"
                   >
                     <div className="space-y-1">
-                      <h4 className="text-xl font-bold text-white">{t.readyHeading}</h4>
+                      <h2 className="text-xl font-bold text-white">{t.readyHeading}</h2>
                       <p className="text-sm text-on-surface-variant">{t.readyDesc}</p>
                     </div>
                     <button
@@ -1013,12 +947,10 @@ export default function App() {
 
                 </div>
 
-              </div>
-            )}
+              </section>
 
             {/* ────── VIEW 3: PROJECTS ────── */}
-            {activeTab === 'projects' && (
-              <div className="py-10 flex flex-col items-center justify-center relative">
+              <section id="projects" className="py-10 flex flex-col items-center justify-center relative scroll-mt-32">
                 
                 {/* Visual Header */}
                 <div className="text-center mb-16 relative">
@@ -1031,390 +963,123 @@ export default function App() {
                   <div className="laser-line w-48 mx-auto" />
                 </div>
 
-                {/* Immersive 3-card project mesh layout */}
-                <motion.div
-                  initial={{ opacity: 0, y: 55 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-100px" }}
-                  transition={{ duration: 0.75, ease: "easeOut" }}
-                  className="grid grid-cols-1 md:grid-cols-12 gap-8 w-full max-w-6xl relative z-25 items-stretch transition-all duration-500"
+                {/* Category filters */}
+                <nav
+                  aria-label={lang === 'en' ? 'Filter projects by category' : 'تصفية المشاريع حسب الفئة'}
+                  className="mb-8 flex w-full max-w-4xl flex-wrap items-center justify-center gap-2"
                 >
-                  
-                  {/* Left Column: PS System Emulation */}
-                  <motion.div 
-                    layout
-                    onMouseEnter={() => setHoveredProject(1)}
-                    onMouseLeave={() => setHoveredProject(null)}
-                    onClick={() => { triggerBeep(600, 0.08); triggerBurst(); }}
-                    animate={{
-                      scale: hoveredProject === 1 ? 1.05 : hoveredProject === null ? 1 : 0.94,
-                      opacity: hoveredProject === 1 ? 1 : hoveredProject === null ? 1 : 0.65,
-                    }}
-                    transition={{ type: 'spring', stiffness: 220, damping: 23 }}
-                    className={`bg-surface-dim/80 glass-panel p-6 rounded-xl flex flex-col justify-between border cursor-pointer select-none overflow-hidden break-words w-full relative z-20 ${
-                      hoveredProject === 1 
-                        ? 'border-primary-container/80 shadow-[0_0_30px_rgba(0,240,255,0.3)]' 
-                        : 'border-white/10'
-                    } ${
-                      hoveredProject === 1 ? 'md:col-span-6 md:mt-0' : 'md:col-span-3 md:mt-16'
-                    }`}
-                  >
-                    <div className="space-y-4 text-left w-full break-words">
-                      <div className="flex justify-between items-start w-full">
-                        <span className="material-symbols-outlined text-3xl text-primary-container">sports_esports</span>
-                        <span className="font-mono text-[10px] text-primary-container/50">v1.4.0</span>
-                      </div>
-                      <h4 className="text-xl md:text-2xl font-black text-white uppercase break-all tracking-tight leading-tight whitespace-normal">
-                        PS_MANAGEMENT_SYS
-                      </h4>
-                      <p className="text-xs text-green-400 font-mono tracking-wider break-words uppercase">+30% OPERATIONAL EFFICIENCY</p>
+                  {projectFilters.map((filter) => {
+                    const isActive = projectFilter === filter.id;
+                    return (
+                      <button
+                        key={filter.id}
+                        type="button"
+                        aria-pressed={isActive}
+                        onClick={() => {
+                          setProjectFilter(filter.id);
+                          triggerBeep(isActive ? 550 : 720, 0.05);
+                        }}
+                        className={`min-h-11 rounded-lg border px-3.5 py-2 font-mono text-[9px] font-bold uppercase tracking-[0.12em] transition-colors sm:text-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-container ${
+                          isActive
+                            ? 'border-primary-container bg-primary-container/15 text-primary-container shadow-[0_0_18px_rgba(0,240,255,0.12)]'
+                            : 'border-white/10 bg-black/20 text-on-surface-variant hover:border-primary-container/35 hover:text-white'
+                        }`}
+                      >
+                        <span className="inline-flex items-center justify-center gap-2">
+                          <span className="material-symbols-outlined text-sm" aria-hidden="true">{filter.icon}</span>
+                          {filter.label[lang]}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </nav>
 
-                      {/* Interactive visual media dashboard box with image */}
-                      <div className="relative w-full aspect-video bg-surface-lowest rounded-lg overflow-hidden border border-white/5 active-glow-shadow">
-                        <img
-                          src={psSystemMockup}
-                          alt="PlayStation Management System Representation"
-                          className="w-full h-full object-cover hover:scale-[1.02] transition-all duration-500"
-                          referrerPolicy="no-referrer"
-                        />
-
-                        {/* Interactive live deployment overlay if compiling */}
-                        {psDeploying && (
-                          <div className="absolute inset-0 bg-surface-lowest/90 backdrop-blur-md flex flex-col items-center justify-center p-6 z-30">
-                            <span className="material-symbols-outlined animate-spin text-primary-container text-3xl mb-4">sync</span>
-                            <div className="font-mono text-xs text-primary-container uppercase tracking-widest mb-2 text-center">Compiling PS Station Matrix...</div>
-                            <div className="h-2 w-42 bg-white/10 rounded-full overflow-hidden">
-                              <div className="h-full bg-primary-container transition-all" style={{ width: `${psProgress}%` }} />
-                            </div>
-                            <span className="font-mono text-[10px] text-white/50 mt-1">{psProgress}%</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed break-words whitespace-normal font-sans">
-                        {lang === 'en' 
-                          ? 'Developed management interface for gaming centers to monitor operations and track inventory; Integrated an AI Agent handling 100+ customer reservations weekly and auto-billing, improving admin efficiency by 30%.' 
-                          : 'تطوير واجهة إدارة لمراكز الألعاب لمراقبة العمليات ومتابعة المخزون؛ تفويض وكيل ذكاء اصطناعي للتعامل مع أكثر من ١٠٠ حجز أسبوعي وفواتير آلية، مما حسن الكفاءة بنسبة ٣٠٪.'}
-                      </p>
-                    </div>
-
-                    <div className="mt-8 space-y-4 w-full">
-                      <div className="laser-line opacity-30" />
-                      <div className="flex flex-wrap gap-1.5">
-                        {['React.js', 'Local Storage', 'AI Agent', 'Tailwind'].map(tg => (
-                          <span key={tg} className="font-mono text-[9px] sm:text-[10px] tech-pill px-2 py-0.5 rounded-full uppercase break-words">{tg}</span>
+                {/* Consistent responsive project grid */}
+                <motion.div
+                  initial={{ opacity: 0, y: 24 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: '-80px' }}
+                  transition={{ duration: 0.55, ease: 'easeOut' }}
+                  className="w-full max-w-7xl"
+                >
+                  <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-2 xl:grid-cols-3">
+                    <AnimatePresence>
+                      {projects
+                        .filter((project) => projectFilter === 'all' || project.category === projectFilter)
+                        .map((project) => (
+                          <ProjectCard
+                            key={project.id}
+                            project={project}
+                            lang={lang}
+                            isLoading={false}
+                            progress={0}
+                            deployLabel={
+                              lang === 'en'
+                                ? `Compiling ${project.title}...`
+                                : `جارٍ تجهيز ${project.title}...`
+                            }
+                            logsLabel={t.btnViewLogs}
+                            onViewLogs={
+                              project.hasLogs === false
+                                ? undefined
+                                : () => handleProjectLogs(project.id)
+                            }
+                            onFeedback={() => {
+                              triggerBeep(project.accent === 'purple' ? 900 : 700, 0.06);
+                              triggerBurst();
+                            }}
+                          />
                         ))}
-                      </div>
-                      
-                      <div className={`grid gap-3 pt-2 ${
-                        (hoveredProject === 2 || hoveredProject === 3) ? 'grid-cols-1' : 'grid-cols-2'
-                      }`}>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleDeployPs(); }}
-                          className={`text-background font-mono text-[10px] sm:text-xs font-bold py-2.5 rounded-lg uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer ${getPrimaryBgColor()}`}
-                        >
-                          <span className="material-symbols-outlined text-sm">launch</span>
-                          {psDeploying ? `${psProgress}%` : t.btnDeploy}
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleShowPsLogs(); }}
-                          className="glass-panel border border-primary-container text-primary-container font-mono text-[10px] sm:text-xs font-bold py-2.5 rounded-lg uppercase tracking-wider hover:bg-primary-container/5 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                        >
-                          <span className="material-symbols-outlined text-sm">terminal</span>
-                          {t.btnViewLogs}
-                        </button>
-                      </div>
-                    </div>
-                  </motion.div>
-
-                  {/* Center Column: Central Enterprise HORAS ERP Panel */}
-                  <motion.div 
-                    layout
-                    onMouseEnter={() => setHoveredProject(2)}
-                    onMouseLeave={() => setHoveredProject(null)}
-                    onClick={() => { triggerBeep(700, 0.08); triggerBurst(); }}
-                    animate={{
-                      scale: hoveredProject === 2 ? 1.05 : hoveredProject === null ? 1 : 0.94,
-                      opacity: hoveredProject === 2 ? 1 : hoveredProject === null ? 1 : 0.65,
-                    }}
-                    transition={{ type: 'spring', stiffness: 220, damping: 23 }}
-                    className={`cursor-pointer z-15 flex flex-col h-full overflow-hidden transition-all duration-500 ${
-                      hoveredProject === 2 ? 'md:col-span-6' : (hoveredProject === 1 || hoveredProject === 3) ? 'md:col-span-3' : 'md:col-span-6'
-                    }`}
-                  >
-                    <div className={`glass-panel p-4 rounded-xl border relative overflow-hidden flex flex-col h-full transition-colors duration-300 w-full ${getThemeClass()} ${
-                      hoveredProject === 2 
-                        ? 'border-[#00f5ab]/85 shadow-[0_0_30px_rgba(0,245,171,0.35)]' 
-                        : 'border-white/10'
-                    }`}>
-                      
-                      {/* Interactive visual media dashboard box with image */}
-                      <div className="relative w-full aspect-video bg-surface-lowest rounded-lg overflow-hidden border border-white/5 active-glow-shadow">
-                        <img
-                          src={horasErpMockup}
-                          alt="HORAS Dashboard interface representation"
-                          className="w-full h-full object-cover hover:scale-[1.02] transition-all duration-500"
-                          referrerPolicy="no-referrer"
-                        />
-                        
-                        {/* Overlay efficiency state - only visible in larger size format for spacing */}
-                        {!(hoveredProject === 1 || hoveredProject === 3) && (
-                          <div className="absolute top-3 right-3 glass-panel p-2.5 rounded-lg border-primary-container/20 flex items-center gap-2 font-mono text-left">
-                            <span className="material-symbols-outlined text-green-400 animate-pulse text-sm">trending_up</span>
-                            <div>
-                              <div className="text-[10px] text-on-surface-variant leading-none uppercase">{t.efficiencyLabel}</div>
-                              <div className="text-base font-bold text-white mt-0.5 leading-none">+40.0%</div>
-                            </div>
-                          </div>
-                        )}
- 
-                        {/* Interactive live deployment overlay if compiling */}
-                        {horasDeploying && (
-                          <div className="absolute inset-0 bg-surface-lowest/90 backdrop-blur-md flex flex-col items-center justify-center p-6 z-30">
-                            <span className="material-symbols-outlined animate-spin text-primary-container text-3xl mb-4">sync</span>
-                            <div className="font-mono text-xs text-primary-container uppercase tracking-widest mb-2 text-center">Compiling Server Matrix...</div>
-                            <div className="h-2 w-42 bg-white/10 rounded-full overflow-hidden">
-                              <div className="h-full bg-primary-container transition-all" style={{ width: `${horasProgress}%` }} />
-                            </div>
-                            <span className="font-mono text-[10px] text-white/50 mt-1">{horasProgress}%</span>
-                          </div>
-                        )}
- 
-                        {/* Standby marker */}
-                        <div className="absolute bottom-3 left-3 flex gap-2">
-                          <div className="glass-panel px-2.5 py-1 rounded flex items-center gap-2 border-primary-container/20">
-                            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                            <span className="font-mono text-[8px] sm:text-[9px] text-white uppercase">{t.horasActiveLabel}</span>
-                          </div>
-                        </div>
-                      </div>
- 
-                      {/* Content representation */}
-                      <div className="p-4 sm:p-5 flex-grow flex flex-col justify-between w-full break-words">
-                        <div>
-                          <div className="flex justify-between items-start mb-3 gap-2 flex-wrap sm:flex-nowrap">
-                            <div>
-                              <h3 className="text-xl sm:text-2xl font-black text-white leading-tight uppercase tracking-tight">HORAS ERP_SYS</h3>
-                              <p className="font-mono text-[9px] sm:text-[10px] text-on-surface-variant uppercase mt-0.5">{t.horasSubtitle}</p>
-                            </div>
-                            <span className="font-mono text-[9px] tech-pill-violet px-2 py-0.5 rounded-full uppercase flex items-center gap-1 whitespace-nowrap">
-                              <span className="material-symbols-outlined text-[10px]">verified</span> {lang === 'en' ? 'Verified' : 'معتمد'}
-                            </span>
-                          </div>
-                          
-                          <div className="laser-line opacity-40 mb-4" />
-                          <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed mb-6 font-sans">
-                            {t.horasDesc}
-                          </p>
-                        </div>
- 
-                        <div className="space-y-4 sm:space-y-6 w-full">
-                          <div className="flex flex-wrap gap-1.5">
-                            {['React.JS', 'Node.JS', 'PostgreSQL', 'WebGL'].map((lbl) => (
-                              <span key={lbl} className="font-mono text-[9px] sm:text-[10px] tech-pill px-2.5 py-1 rounded border-primary-container/20 uppercase">
-                                {lbl}
-                              </span>
-                            ))}
-                          </div>
- 
-                          <div className={`grid gap-3 pt-2 ${
-                            (hoveredProject === 1 || hoveredProject === 3) ? 'grid-cols-1' : 'grid-cols-2'
-                          }`}>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleDeployInstance(); }}
-                              className={`text-background font-mono text-[10px] sm:text-xs font-bold py-2.5 rounded-lg uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer ${getPrimaryBgColor()}`}
-                            >
-                              <span className="material-symbols-outlined text-sm">launch</span>
-                              {horasDeploying ? `${horasProgress}%` : t.btnDeploy}
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleShowLogs(); }}
-                              className="glass-panel border border-primary-container text-primary-container font-mono text-[10px] sm:text-xs font-bold py-2.5 rounded-lg uppercase tracking-wider hover:bg-primary-container/5 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                            >
-                              <span className="material-symbols-outlined text-sm">terminal</span>
-                              {t.btnViewLogs}
-                            </button>
-                          </div>
-                        </div>
- 
-                      </div>
- 
-                    </div>
-                  </motion.div>
- 
-                  {/* Right Column: Nexus Commerce E-Shop */}
-                  <motion.div 
-                    layout
-                    onMouseEnter={() => setHoveredProject(3)}
-                    onMouseLeave={() => setHoveredProject(null)}
-                    onClick={() => { triggerBeep(800, 0.08); triggerBurst(); }}
-                    animate={{
-                      scale: hoveredProject === 3 ? 1.05 : hoveredProject === null ? 1 : 0.94,
-                      opacity: hoveredProject === 3 ? 1 : hoveredProject === null ? 1 : 0.65,
-                    }}
-                    transition={{ type: 'spring', stiffness: 220, damping: 23 }}
-                    className={`bg-surface-dim/80 glass-panel p-6 rounded-xl flex flex-col justify-between border cursor-pointer select-none overflow-hidden break-words w-full relative z-20 ${
-                      hoveredProject === 3 
-                        ? 'border-secondary/80 shadow-[0_0_30px_rgba(112,0,255,0.3)]' 
-                        : 'border-white/10'
-                    } ${
-                      hoveredProject === 3 ? 'md:col-span-6 md:mt-0' : 'md:col-span-3 md:mt-16'
-                    }`}
-                  >
-                    <div className="space-y-4 text-left w-full break-words">
-                      <div className="flex justify-between items-start w-full">
-                        <span className="material-symbols-outlined text-3xl text-secondary">shopping_cart</span>
-                        <span className="font-mono text-[10px] text-secondary/50">v1.2.0</span>
-                      </div>
-                      <h4 className="text-xl md:text-2xl font-black text-white uppercase break-all tracking-tight leading-tight whitespace-normal">
-                        HORAS_SHOP
-                      </h4>
-                      <div className="flex gap-4">
-                        <p className="text-xs text-purple-400 font-mono">+20% RETENTION</p>
-                        <p className="text-xs text-purple-400 font-mono">95+ LIGHTHOUSE</p>
-                      </div>
-
-                      {/* Interactive visual media dashboard box with image */}
-                      <div className="relative w-full aspect-video bg-surface-lowest rounded-lg overflow-hidden border border-white/5 active-glow-shadow">
-                        <img
-                          src={horasShopMockup}
-                          alt="HORAS Shop E-Commerce interface representation"
-                          className="w-full h-full object-cover hover:scale-[1.02] transition-all duration-500"
-                          referrerPolicy="no-referrer"
-                        />
-
-                        {/* Interactive live deployment overlay if compiling */}
-                        {shopDeploying && (
-                          <div className="absolute inset-0 bg-surface-lowest/90 backdrop-blur-md flex flex-col items-center justify-center p-6 z-30">
-                            <span className="material-symbols-outlined animate-spin text-secondary text-3xl mb-4">sync</span>
-                            <div className="font-mono text-xs text-secondary uppercase tracking-widest mb-2 text-center">Compiling Web Shop...</div>
-                            <div className="h-2 w-42 bg-white/10 rounded-full overflow-hidden">
-                              <div className="h-full bg-secondary transition-all" style={{ width: `${shopProgress}%` }} />
-                            </div>
-                            <span className="font-mono text-[10px] text-white/50 mt-1">{shopProgress}%</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <p className="text-xs sm:text-sm text-on-surface-variant leading-relaxed break-words whitespace-normal font-sans">
-                        {lang === 'en'
-                          ? 'Engineered high-performance frontend with Local Storage cart persistence and high-contrast styling boosting retention by 20%, maintaining near-perfect lighthouse scores.'
-                          : 'منصة تسوق رقمية بمزامنة سلة مشتريات محلية عبر Local Storage مع كفاءة أداء معتمدة وتصاميم تزيد تفاعل الزوار بنسبة ٢٠٪.'}
-                      </p>
-                    </div>
-
-                    <div className="mt-8 space-y-4 w-full">
-                      <div className="laser-line opacity-30" style={{ background: 'linear-gradient(90deg, transparent, rgba(112,0,255,0.8), transparent)' }} />
-                      <div className="flex flex-wrap gap-1.5">
-                        {['JavaScript', 'Local Storage', 'CSS Flexbox', 'Tailwind'].map(tg => (
-                          <span key={tg} className="font-mono text-[9px] sm:text-[10px] tech-pill-violet px-2.5 py-1 rounded-full uppercase break-words">{tg}</span>
-                        ))}
-                      </div>
-
-                      <div className={`grid gap-3 pt-2 ${
-                        (hoveredProject === 1 || hoveredProject === 2) ? 'grid-cols-1' : 'grid-cols-2'
-                      }`}>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleDeployShop(); }}
-                          className="w-full bg-secondary hover:bg-secondary/90 text-background font-mono text-[10px] sm:text-xs font-bold py-2.5 rounded-lg uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                        >
-                          <span className="material-symbols-outlined text-sm">launch</span>
-                          {shopDeploying ? `${shopProgress}%` : t.btnDeploy}
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleShowShopLogs(); }}
-                          className="glass-panel border border-secondary text-secondary font-mono text-[10px] sm:text-xs font-bold py-2.5 rounded-lg uppercase tracking-wider hover:bg-secondary/5 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                        >
-                          <span className="material-symbols-outlined text-sm">terminal</span>
-                          {t.btnViewLogs}
-                        </button>
-                      </div>
-                    </div>
-                  </motion.div>
-
+                    </AnimatePresence>
+                  </div>
                 </motion.div>
 
-                {/* Simulated interactive HUD server console for horror logs */}
+                {/* Factual system overview */}
+                <div className="mt-8 grid w-full max-w-7xl grid-cols-2 overflow-hidden rounded-xl border border-primary-container/20 bg-black/25 shadow-[0_0_26px_rgba(0,240,255,0.06)] lg:grid-cols-4">
+                  {[
+                    {
+                      icon: 'deployed_code',
+                      value: String(projects.length),
+                      label: lang === 'en' ? 'SELECTED PROJECTS' : 'مشاريع مختارة',
+                    },
+                    {
+                      icon: 'code',
+                      value: 'REACT / NEXT',
+                      label: lang === 'en' ? 'CORE STACK' : 'التقنيات الأساسية',
+                    },
+                    {
+                      icon: 'devices',
+                      value: 'RESPONSIVE',
+                      label: lang === 'en' ? 'ALL DEVICES' : 'كل الأجهزة',
+                    },
+                    {
+                      icon: 'cloud_done',
+                      value: 'PRODUCTION',
+                      label: lang === 'en' ? 'LIVE STORE' : 'متجر منشور',
+                    },
+                  ].map((stat, index) => (
+                    <div
+                      key={stat.label}
+                      className={`flex min-w-0 items-center gap-3 px-3 py-4 sm:px-5 ${
+                        index % 2 !== 0 ? 'border-s border-white/10' : ''
+                      } ${index >= 2 ? 'border-t border-white/10 lg:border-t-0' : ''} ${
+                        index > 0 ? 'lg:border-s lg:border-white/10' : ''
+                      }`}
+                    >
+                      <span className="material-symbols-outlined shrink-0 text-xl text-primary-container" aria-hidden="true">
+                        {stat.icon}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="break-words font-mono text-[10px] font-black uppercase text-white sm:text-xs">{stat.value}</p>
+                        <p className="mt-0.5 break-words font-mono text-[7px] uppercase tracking-[0.1em] text-on-surface-variant sm:text-[8px]">
+                          {stat.label}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
                 <AnimatePresence>
-                  {showHorasLogs && (
-                    <motion.div
-                      initial={{ scale: 0.95, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={{ scale: 0.95, opacity: 0 }}
-                      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#050505]/80 backdrop-blur-md"
-                      id="simulated-terminal-overlay"
-                    >
-                      <div className="glass-panel w-full max-w-2xl rounded-xl overflow-hidden neon-glow-intense flex flex-col max-h-[500px]" style={{ direction: 'ltr' }}>
-                        <div className="flex items-center justify-between bg-surface-lowest px-5 py-3 border-b border-white/10">
-                          <div className="flex items-center gap-2">
-                            <span className="w-3 h-3 rounded-full bg-red-400" />
-                            <span className="w-3 h-3 rounded-full bg-yellow-400" />
-                            <span className="w-3 h-3 rounded-full bg-green-400" />
-                            <span className="font-mono text-xs text-white/70 ml-2 uppercase tracking-widest">HORAS_DEPLOY.LOG</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <button
-                              onClick={() => { triggerBeep(800, 0.08); setShowHorasLogs(false); setShowHorasSimulator(true); }}
-                              className="bg-blue-600 hover:bg-blue-700 text-white font-mono text-[10px] py-1 px-3 rounded uppercase flex items-center gap-1 cursor-pointer"
-                            >
-                              <span className="material-symbols-outlined text-xs">dashboard</span>
-                              {lang === 'en' ? 'Launch Interactive ERP' : 'تشغيل واجهة النظام تفاعلياً'}
-                            </button>
-                            <button
-                              onClick={() => { triggerBeep(900, 0.05); setShowHorasLogs(false); }}
-                              className="text-on-surface-variant hover:text-white cursor-pointer"
-                            >
-                              <span className="material-symbols-outlined text-lg">close</span>
-                            </button>
-                          </div>
-                        </div>
-                        <div className="p-6 bg-black font-mono text-xs text-[#00f0ff] space-y-2.5 overflow-y-auto flex-grow text-left">
-                          {horasLogs.map((log, index) => (
-                            <div key={index} className="leading-relaxed whitespace-pre-wrap">
-                              {log}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-
-                  {showPsLogs && (
-                    <motion.div
-                      initial={{ scale: 0.95, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={{ scale: 0.95, opacity: 0 }}
-                      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#050505]/80 backdrop-blur-md"
-                      id="simulated-ps-terminal-overlay"
-                    >
-                      <div className="glass-panel w-full max-w-2xl rounded-xl overflow-hidden neon-glow-intense flex flex-col max-h-[500px]" style={{ direction: 'ltr' }}>
-                        <div className="flex items-center justify-between bg-surface-lowest px-5 py-3 border-b border-white/10">
-                          <div className="flex items-center gap-2">
-                            <span className="w-3 h-3 rounded-full bg-red-400" />
-                            <span className="w-3 h-3 rounded-full bg-yellow-400" />
-                            <span className="w-3 h-3 rounded-full bg-green-400" />
-                            <span className="font-mono text-xs text-white/70 ml-2 uppercase tracking-widest">PLAYSTATION_MANAGEMENT_STATION.LOG</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <button
-                              onClick={() => { triggerBeep(900, 0.05); setShowPsLogs(false); }}
-                              className="text-on-surface-variant hover:text-white cursor-pointer"
-                            >
-                              <span className="material-symbols-outlined text-lg">close</span>
-                            </button>
-                          </div>
-                        </div>
-                        <div className="p-6 bg-black font-mono text-xs text-[#00f0ff] space-y-2.5 overflow-y-auto flex-grow text-left">
-                          {psLogs.map((log, index) => (
-                            <div key={index} className="leading-relaxed whitespace-pre-wrap">
-                              {log}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-
                   {showShopLogs && (
                     <motion.div
                       initial={{ scale: 0.95, opacity: 0 }}
@@ -1423,18 +1088,19 @@ export default function App() {
                       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#050505]/80 backdrop-blur-md"
                       id="simulated-shop-terminal-overlay"
                     >
-                      <div className="glass-panel w-full max-w-2xl rounded-xl overflow-hidden neon-glow-intense flex flex-col max-h-[500px]" style={{ direction: 'ltr' }}>
+                      <div ref={shopLogsDialogRef} role="dialog" aria-modal="true" aria-labelledby="shop-logs-title" tabIndex={-1} className="glass-panel w-full max-w-2xl rounded-xl overflow-hidden neon-glow-intense flex flex-col max-h-[500px]" style={{ direction: 'ltr' }}>
                         <div className="flex items-center justify-between bg-surface-lowest px-5 py-3 border-b border-white/10">
                           <div className="flex items-center gap-2">
                             <span className="w-3 h-3 rounded-full bg-red-400" />
                             <span className="w-3 h-3 rounded-full bg-yellow-400" />
                             <span className="w-3 h-3 rounded-full bg-green-400" />
-                            <span className="font-mono text-xs text-white/70 ml-2 uppercase tracking-widest">HORAS_SHOP_SECURE_GATEWAY.LOG</span>
+                            <span id="shop-logs-title" className="font-mono text-xs text-white/70 ml-2 uppercase tracking-widest">HORAS_STORE_PRODUCTION.LOG</span>
                           </div>
                           <div className="flex items-center gap-3">
                             <button
                               onClick={() => { triggerBeep(900, 0.05); setShowShopLogs(false); }}
                               className="text-on-surface-variant hover:text-white cursor-pointer"
+                              aria-label={lang === 'en' ? 'Close HORAS Shop logs' : 'إغلاق سجلات متجر هوراس'}
                             >
                               <span className="material-symbols-outlined text-lg">close</span>
                             </button>
@@ -1452,12 +1118,10 @@ export default function App() {
                   )}
                 </AnimatePresence>
 
-              </div>
-            )}
+              </section>
 
             {/* ────── VIEW 4: SKILLS & CERTIFICATIONS ────── */}
-            {activeTab === 'skills' && (
-              <div className="space-y-16 py-10">
+              <section id="certificates" className="space-y-16 py-10 scroll-mt-32">
                 
                 {/* Embedded dynamic badge visual */}
                 <div className="text-center">
@@ -1477,7 +1141,7 @@ export default function App() {
                 <div id="skills-subsection">
                   <div className="flex items-center gap-3 mb-6 font-mono text-white">
                     <span className="material-symbols-outlined text-primary-container text-2xl">hub</span>
-                    <h3 className="text-lg md:text-xl font-bold uppercase tracking-widest">{t.neuralMatrix}</h3>
+                    <h2 className="text-lg md:text-xl font-bold uppercase tracking-widest">{t.neuralMatrix}</h2>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1487,7 +1151,7 @@ export default function App() {
                       <div className="flex justify-between items-start mb-6">
                         <div>
                           <p className="font-mono text-[10px] text-primary-container uppercase mb-1">{t.primaryDirective}</p>
-                          <h4 className="text-xl font-black text-white">{lang === 'en' ? 'Frontend Architecture' : 'هندسة الأنظمة والواجهات الأمامية'}</h4>
+                          <h3 className="text-xl font-black text-white">{lang === 'en' ? 'Frontend Architecture' : 'هندسة الأنظمة والواجهات الأمامية'}</h3>
                         </div>
                         <span className="material-symbols-outlined text-primary-container text-lg">code</span>
                       </div>
@@ -1500,29 +1164,9 @@ export default function App() {
                         ))}
                       </div>
 
-                      {/* Progression status stats displaying metrics */}
-                      <div className="space-y-5">
-                        {[
-                          { title: 'React.js / Next.js', pct: '95%' },
-                          { title: 'TypeScript', pct: '88%' },
-                          { title: 'Three.js / WebGL', pct: '82%' },
-                          { title: 'CSS / Tailwind / Motion Animations', pct: '98%' }
-                        ].map((s_item, idx) => (
-                          <div key={idx} className="space-y-2">
-                            <div className="flex justify-between font-mono text-xs text-on-surface-variant">
-                              <span>{s_item.title}</span>
-                              <span className={getPrimaryTextColor()}>{s_item.pct}</span>
-                            </div>
-                            <div className="h-1 bg-white/10 rounded-full overflow-hidden">
-                              <motion.div
-                                initial={{ width: 0 }}
-                                whileInView={{ width: s_item.pct }}
-                                viewport={{ once: true }}
-                                transition={{ duration: 1.2, ease: 'easeInOut' }}
-                                className={`h-full ${getPrimaryBgColor()}`}
-                              />
-                            </div>
-                          </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-mono text-xs text-on-surface-variant">
+                        {['React', 'Next.js', 'TypeScript', 'JavaScript', 'HTML & CSS', 'Tailwind CSS'].map((skill) => (
+                          <div key={skill} className="border border-white/10 rounded-lg px-3 py-2 text-white/80">● {skill}</div>
                         ))}
                       </div>
                     </div>
@@ -1531,7 +1175,7 @@ export default function App() {
                     <div className="glass-panel rounded-xl p-6 flex flex-col justify-between relative overflow-hidden bg-gradient-to-br from-surface-dim to-[#0a001a] border border-white/5">
                       <div className="space-y-1">
                         <p className="font-mono text-[10px] text-on-surface-variant uppercase">{t.executionVelocity}</p>
-                        <h4 className={`text-5xl font-black tracking-tighter ${getPrimaryTextColor()}`}>98.28%</h4>
+                        <h4 className={`text-3xl font-black tracking-tight ${getPrimaryTextColor()}`}>{lang === 'en' ? 'Available for Work' : 'متاح للعمل'}</h4>
                         <p className="text-xs text-on-surface-variant font-sans pt-1 leading-relaxed">
                           {t.velocityDesc}
                         </p>
@@ -1541,7 +1185,7 @@ export default function App() {
                         <div className="h-1 bg-white/5 rounded-full overflow-hidden mb-4">
                           <motion.div
                             initial={{ width: 0 }}
-                            whileInView={{ width: '98.28%' }}
+                            whileInView={{ width: '100%' }}
                             viewport={{ once: true }}
                             transition={{ duration: 1.5, ease: 'easeOut' }}
                             className={`rounded-full h-full ${getPrimaryBgColor()}`}
@@ -1553,7 +1197,7 @@ export default function App() {
                           </div>
                           <div>
                             <div className="font-mono text-[10px] text-white/50 leading-none">MZ COMPLIANCE</div>
-                            <div className={`font-mono text-xs font-bold uppercase mt-1 ${getPrimaryTextColor()}`}>SYSTEMS NOMINAL</div>
+                            <div className={`font-mono text-xs font-bold uppercase mt-1 ${getPrimaryTextColor()}`}>{lang === 'en' ? 'OPEN TO OPPORTUNITIES' : 'متاح للفرص'}</div>
                           </div>
                         </div>
                       </div>
@@ -1610,7 +1254,7 @@ export default function App() {
                   <div className="flex items-center justify-between font-mono text-white border-b border-white/10 pb-4">
                     <div className="flex items-center gap-3">
                       <span className="material-symbols-outlined text-primary-container text-2xl">verified_user</span>
-                      <h3 className="text-lg md:text-xl font-bold uppercase tracking-widest">{t.encryptedVault}</h3>
+                      <h2 className="text-lg md:text-xl font-bold uppercase tracking-widest">{t.encryptedVault}</h2>
                     </div>
                     <span className="text-xs text-on-surface-variant uppercase">{t.recordsCount}</span>
                   </div>
@@ -1628,7 +1272,17 @@ export default function App() {
                           viewport={{ once: true, margin: "-40px" }}
                           transition={{ duration: 0.5, delay: idx * 0.12 }}
                           onClick={() => handleDecryptCert(cert.id)}
-                          className={`glass-panel rounded-xl p-6 border transition-all duration-300 relative select-none cursor-pointer overflow-hidden ${
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              handleDecryptCert(cert.id);
+                            }
+                          }}
+                          role="button"
+                          tabIndex={0}
+                          aria-pressed={isDecrypted}
+                          aria-label={isDecrypted ? `${cert.title} — ${t.decrypted}` : `${cert.title} — ${t.hoverDecrypt}`}
+                          className={`glass-panel rounded-xl p-6 border transition-all duration-300 relative select-none cursor-pointer overflow-hidden text-left rtl:text-right w-full ${
                             isDecrypted 
                               ? 'border-green-500/30 shadow-[0_4px_25px_rgba(34,197,94,0.1)] bg-green-500/5' 
                               : isProcessing 
@@ -1665,14 +1319,14 @@ export default function App() {
                           <div className="space-y-1">
                             {isDecrypted ? (
                               <>
-                                <h4 className="text-lg font-bold text-white leading-tight animate-fade-in">{cert.title}</h4>
+                                <h3 className="text-lg font-bold text-white leading-tight animate-fade-in">{cert.title}</h3>
                                 <p className="font-mono text-xs uppercase text-green-400 pt-1 tracking-widest leading-none">
                                   {cert.issuer}
                                 </p>
                               </>
                             ) : (
                               <>
-                                <h4 className="text-lg font-bold text-white/20 select-none tracking-widest blur-[3px]">XXXXXXXXXXXXX</h4>
+                                <h3 className="text-lg font-bold text-white/20 select-none tracking-widest blur-[3px]">XXXXXXXXXXXXX</h3>
                                 <p className="font-mono text-xs text-yellow-500/40 select-none blur-[2px] pt-1">
                                   XXXXXX XXX
                                 </p>
@@ -1721,6 +1375,18 @@ export default function App() {
                                   </div>
                                 </div>
                               )}
+                              {cert.verificationUrl && (
+                                <a
+                                  href={cert.verificationUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(event) => event.stopPropagation()}
+                                  className={`mt-3 inline-flex w-full items-center justify-center gap-2 rounded-md border border-primary-container/40 bg-primary-container/10 px-3 py-2 font-mono text-[10px] font-bold uppercase text-primary-container transition-colors hover:bg-primary-container/20 hover:text-white focus:outline-none focus:ring-2 focus:ring-primary-container/60`}
+                                >
+                                  <span className="material-symbols-outlined text-sm" aria-hidden="true">open_in_new</span>
+                                  {t.viewCertificate}
+                                </a>
+                              )}
                             </div>
                           )}
 
@@ -1738,12 +1404,10 @@ export default function App() {
                   </div>
                 </div>
 
-              </div>
-            )}
+              </section>
 
             {/* ────── VIEW 5: CONTACT TERMINAL ────── */}
-            {activeTab === 'contact' && (
-              <div className="space-y-8 py-10">
+              <section id="contact" className="space-y-8 py-10 scroll-mt-32">
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
                   
                   {/* Left side terminal visual about logs */}
@@ -1776,16 +1440,16 @@ export default function App() {
                       <div className="pt-4 border-t border-white/10 text-xs text-on-surface-variant/80 space-y-3 leading-relaxed">
                         <p>
                           {lang === 'en'
-                            ? 'Specialized in high-fidelity interface engineering and synthetic environment construction. Primary directives include optimizing user-flow matrix and deploying scalable UI architectures.'
-                            : 'متخصص في تصميم النظم والواجهات البرمجية وتشييد الواجهات التفاعلية ثلاثية الأبعاد. تتضمن التوجيهات التشغيلية تحسين مساقات التدفق ونشر هيكليات مرنة.'}
+                            ? 'I build clear, responsive interfaces that help businesses present their services and products online.'
+                            : 'أبني واجهات واضحة ومتجاوبة تساعد الشركات على عرض خدماتها ومنتجاتها عبر الإنترنت.'}
                         </p>
                       </div>
 
                       <div className="mt-5 pt-4 border-t border-white/10 font-mono text-xs text-primary-container space-y-1 text-left" style={{ direction: 'ltr' }}>
                         <p className="font-bold">&gt;&gt; SKILL_MATRIX_DUMP:</p>
-                        <p className="text-on-surface-variant">• UI/UX ARCHITECTURE: 98%</p>
-                        <p className="text-on-surface-variant">• FRONTEND SYNTHESIS: 95%</p>
-                        <p className="text-on-surface-variant">• 3D VISUALIZATION: 88%</p>
+                        <p className="text-on-surface-variant">• React · Next.js · TypeScript</p>
+                        <p className="text-on-surface-variant">• Responsive Web Applications</p>
+                        <p className="text-on-surface-variant">• Accessible, Usable Interfaces</p>
                       </div>
                     </div>
 
@@ -1853,6 +1517,19 @@ export default function App() {
                           </div>
                           <span className="font-mono text-[9px] md:text-[10px] text-primary-container px-1.5 py-0.5 rounded bg-primary-container/10 group-hover:bg-primary-container/20 group-hover:text-white transition-all select-all">+201148823888</span>
                         </a>
+
+                        {/* Email */}
+                        <a
+                          href="mailto:moazhoras@gmail.com"
+                          onClick={() => triggerBeep(950, 0.05)}
+                          className="flex items-center justify-between p-3 rounded-lg border border-white/5 bg-white/[0.02] hover:bg-primary-container/10 hover:border-primary-container/30 transition-all font-mono text-xs text-white group"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="material-symbols-outlined text-primary-container group-hover:scale-110 transition-transform">mail</span>
+                            <span className="font-bold">{lang === 'en' ? 'Email' : 'البريد الإلكتروني'}</span>
+                          </div>
+                          <span className="font-mono text-[9px] text-primary-container truncate max-w-[55%]">moazhoras@gmail.com</span>
+                        </a>
                       </div>
                     </div>
 
@@ -1872,9 +1549,9 @@ export default function App() {
                       <div className="absolute top-0 left-0 w-6 h-6 border-t-2 border-l-2 border-primary-container" />
                       <div className="absolute bottom-0 right-0 w-6 h-6 border-b-2 border-r-2 border-primary-container" />
 
-                      <h3 className={`text-3xl md:text-4xl font-black mb-1 drop-shadow-[0_0_10px_rgba(0,240,255,0.30)] uppercase tracking-tight ${getPrimaryTextColor()}`}>
+                      <h2 className={`text-3xl md:text-4xl font-black mb-1 drop-shadow-[0_0_10px_rgba(0,240,255,0.30)] uppercase tracking-tight ${getPrimaryTextColor()}`}>
                         {t.secureLink}
-                      </h3>
+                      </h2>
                       <p className="font-mono text-xs text-on-surface-variant uppercase tracking-widest mb-10 leading-none">
                         {t.secureSub}
                       </p>
@@ -2166,23 +1843,26 @@ export default function App() {
                   </div>
                 </div>
 
-              </div>
-            )}
-          </motion.div>
-        </AnimatePresence>
+              </section>
       </main>
 
-      {/* Global Toast successful transmission notification */}
+      {/* Global non-blocking status notification */}
       <AnimatePresence>
-        {showToast && (
+        {toast && (
           <motion.div
             initial={{ y: 80, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 80, opacity: 0 }}
-            className="fixed bottom-6 right-6 z-50 bg-green-500/10 border-2 border-green-500/40 backdrop-blur-md px-6 py-4 rounded-lg font-mono text-xs text-green-400 font-bold tracking-wider select-none active-glow-shadow text-left"
+            role="status"
+            aria-live="polite"
+            className={`fixed bottom-6 right-6 z-[110] border-2 backdrop-blur-md px-6 py-4 rounded-lg font-mono text-xs font-bold tracking-wider select-none active-glow-shadow text-left max-w-[calc(100vw-3rem)] ${
+              toast.type === 'error'
+                ? 'bg-red-500/10 border-red-500/40 text-red-300'
+                : 'bg-green-500/10 border-green-500/40 text-green-400'
+            }`}
             id="toast-notification"
           >
-            {t.toastSuccess}
+            {toast.message}
           </motion.div>
         )}
       </AnimatePresence>
@@ -2198,6 +1878,11 @@ export default function App() {
             id="settings-overlay-modal"
           >
             <motion.div
+              ref={settingsDialogRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="settings-dialog-title"
+              tabIndex={-1}
               initial={{ y: 20, scale: 0.95 }}
               animate={{ y: 0, scale: 1 }}
               exit={{ y: 20, scale: 0.95 }}
@@ -2206,11 +1891,12 @@ export default function App() {
               <div className="flex justify-between items-center border-b border-white/10 pb-4">
                 <div className="flex items-center gap-2 font-mono text-sm font-bold text-white uppercase tracking-wider">
                   <span className="material-symbols-outlined text-lg">settings</span>
-                  <span>SYSTEM_CONFIG.CFG</span>
+                  <span id="settings-dialog-title">SYSTEM_CONFIG.CFG</span>
                 </div>
                 <button
                   onClick={() => { triggerBeep(900, 0.05); setShowSettings(false); }}
                   className="text-on-surface-variant hover:text-white cursor-pointer"
+                  aria-label={lang === 'en' ? 'Close settings' : 'إغلاق الإعدادات'}
                 >
                   <span className="material-symbols-outlined text-lg">close</span>
                 </button>
@@ -2258,6 +1944,8 @@ export default function App() {
                     className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ${
                       soundEnabled ? getPrimaryBgColor() : 'bg-white/10'
                     }`}
+                    aria-label={lang === 'en' ? 'Toggle interface sound effects' : 'تبديل المؤثرات الصوتية للواجهة'}
+                    aria-pressed={soundEnabled}
                   >
                     <div className={`w-4 h-4 rounded-full bg-black transition-transform duration-300 transform ${
                       soundEnabled ? 'translate-x-6' : 'translate-x-0'
@@ -2312,7 +2000,7 @@ export default function App() {
             className={`flex items-center gap-2 font-bold text-base select-none cursor-pointer tracking-wide ${getPrimaryTextColor()}`}
           >
             <div className="w-6 h-6 rounded-full border border-primary-container/20 overflow-hidden bg-white/5 flex items-center justify-center shrink-0">
-              <img src={developerLogo} alt="Moaz Mohamed" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              <img src={developerLogo} alt="" aria-hidden="true" width={1408} height={768} loading="lazy" decoding="async" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
             </div>
             <span>Moaz Mohamed</span>
           </a>
@@ -2321,13 +2009,17 @@ export default function App() {
           <div className="flex flex-wrap justify-center gap-5 font-mono text-[11px] leading-none uppercase tracking-widest">
             {[
               { id: 'projects', label: t.navProjects },
-              { id: 'skills', label: t.navSkills },
+              { id: 'certificates', label: t.navSkills },
               { id: 'about', label: t.navAbout },
               { id: 'contact', label: t.navContact }
             ].map((lnk) => (
               <a
                 key={lnk.id}
-                onClick={() => handleTabChange(lnk.id as ActiveTab)}
+                href={`#${lnk.id}`}
+                onClick={(event) => {
+                  event.preventDefault();
+                  handleTabChange(lnk.id as ActiveTab);
+                }}
                 className="text-on-surface-variant hover:text-white cursor-pointer transition-colors"
               >
                 {lnk.label}
@@ -2336,17 +2028,10 @@ export default function App() {
           </div>
 
           <div className="font-mono text-[10px] text-on-surface-variant/75 uppercase tracking-widest mr-0" id="footer-operational-indicator">
-            © {new Date().getFullYear()} MZ. ALL SYSTEMS OPERATIONAL.
+            © {new Date().getFullYear()} MZ. FRONT-END DEVELOPMENT & DIGITAL EXPERIENCES.
           </div>
         </div>
       </footer>
-
-      <HorasSimulator
-        isOpen={showHorasSimulator}
-        onClose={() => setShowHorasSimulator(false)}
-        lang={lang}
-        triggerBeep={triggerBeep}
-      />
 
       {/* Global Dynamic Burst layers */}
       <AnimatePresence>
