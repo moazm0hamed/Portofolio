@@ -748,11 +748,11 @@ export default function App() {
               </section>
 
             {/* ────── VIEW 2: ABOUT ────── */}
-              <section id="about" className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start py-10 scroll-mt-32">
+              <section id="about" className="grid grid-cols-1 gap-8 py-10 md:gap-10 md:py-12 xl:grid-cols-12 xl:gap-8 xl:py-10 items-start scroll-mt-32">
                 
                 {/* Left Card sidebar - profile card */}
-                <div className="md:col-span-4 space-y-6">
-                  <div className={`glass-panel rounded-xl p-6 glow-primary text-center relative ${getThemeClass()}`}>
+                <div className="space-y-6 xl:col-span-4">
+                  <div className={`glass-panel rounded-xl p-6 md:p-8 xl:p-6 glow-primary text-center relative ${getThemeClass()}`}>
                     
                     {/* Simulated pulse online marker */}
                     <div className="relative inline-block mb-6 pt-4">
@@ -810,23 +810,23 @@ export default function App() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true, margin: "-50px" }}
                     transition={{ duration: 0.6 }}
-                    className="grid grid-cols-3 gap-3"
+                    className="grid grid-cols-3 gap-3 md:gap-5 xl:gap-3"
                   >
-                    <div className="glass-panel rounded-xl p-4 text-center">
-                      <div className={`whitespace-nowrap text-[13px] font-black leading-tight sm:text-lg ${getPrimaryTextColor()}`}>{lang === 'en' ? 'Responsive' : 'متجاوبة'}</div>
-                      <div className="font-mono text-[10px] text-on-surface-variant uppercase mt-1">
+                    <div className="glass-panel rounded-xl p-4 text-center md:p-5 xl:p-4">
+                      <div className={`whitespace-nowrap text-[13px] font-black leading-tight sm:text-lg md:text-xl xl:text-lg ${getPrimaryTextColor()}`}>{lang === 'en' ? 'Responsive' : 'متجاوبة'}</div>
+                      <div className="font-mono text-[10px] text-on-surface-variant uppercase mt-1 md:text-[11px] xl:text-[10px]">
                         {t.yearsLabel}
                       </div>
                     </div>
-                    <div className="glass-panel rounded-xl p-4 text-center">
-                      <div className={`text-lg font-black leading-tight ${getPrimaryTextColor()}`}>{lang === 'en' ? 'Modern' : 'عصرية'}</div>
-                      <div className="font-mono text-[10px] text-on-surface-variant uppercase mt-1">
+                    <div className="glass-panel rounded-xl p-4 text-center md:p-5 xl:p-4">
+                      <div className={`text-lg font-black leading-tight md:text-xl xl:text-lg ${getPrimaryTextColor()}`}>{lang === 'en' ? 'Modern' : 'عصرية'}</div>
+                      <div className="font-mono text-[10px] text-on-surface-variant uppercase mt-1 md:text-[11px] xl:text-[10px]">
                         {t.projectsLabel}
                       </div>
                     </div>
-                    <div className="glass-panel rounded-xl p-4 text-center">
-                      <div className={`text-lg font-black leading-tight ${getPrimaryTextColor()}`}>{lang === 'en' ? 'Available' : 'متاح'}</div>
-                      <div className="font-mono text-[10px] text-on-surface-variant uppercase mt-1">
+                    <div className="glass-panel rounded-xl p-4 text-center md:p-5 xl:p-4">
+                      <div className={`text-lg font-black leading-tight md:text-xl xl:text-lg ${getPrimaryTextColor()}`}>{lang === 'en' ? 'Available' : 'متاح'}</div>
+                      <div className="font-mono text-[10px] text-on-surface-variant uppercase mt-1 md:text-[11px] xl:text-[10px]">
                         {t.certsLabel}
                       </div>
                     </div>
@@ -834,7 +834,7 @@ export default function App() {
                 </div>
 
                 {/* Right side system profile & timeline details */}
-                <div className="md:col-span-8 space-y-6">
+                <div className="space-y-6 xl:col-span-8">
                   
                   {/* Mission Statement panel */}
                   <motion.div
@@ -847,13 +847,13 @@ export default function App() {
                     <div className="flex items-center gap-2 mb-4 font-mono text-xs text-primary-container">
                       <span className={getPrimaryTextColor()}>{t.missionSys}</span>
                     </div>
-                    <h2 className="text-3xl font-black text-white mb-4 tracking-tight leading-tight">
+                    <h2 className="text-3xl font-black text-white mb-4 tracking-tight leading-tight md:text-4xl xl:text-3xl">
                       {t.missionHeading} <span className={getPrimaryTextColor()}>{t.missionHeadingHighlight}</span>
                     </h2>
-                    <p className="text-base text-on-surface-variant leading-relaxed mb-4">
+                    <p className="text-base text-on-surface-variant leading-relaxed mb-4 md:text-lg xl:text-base">
                       {t.missionP1}
                     </p>
-                    <p className="text-base text-on-surface-variant leading-relaxed">
+                    <p className="text-base text-on-surface-variant leading-relaxed md:text-lg xl:text-base">
                       {t.missionP2}
                     </p>
                   </motion.div>
@@ -866,12 +866,12 @@ export default function App() {
                     transition={{ duration: 0.7 }}
                     className="glass-panel rounded-xl p-6 md:p-8"
                   >
-                    <div className="flex items-center gap-2 mb-8 font-mono text-xs text-primary-container">
+                    <div className="flex items-center gap-2 mb-8 font-mono text-xs text-primary-container md:mb-10 xl:mb-8">
                       <span className="material-symbols-outlined text-md">timeline</span>
                       <span className={getPrimaryTextColor()}>{t.timelineSys}</span>
                     </div>
 
-                    <div className="relative pl-8 rtl:pl-0 rtl:pr-8 space-y-8" id="career-timeline">
+                    <div className="relative pl-8 rtl:pl-0 rtl:pr-8 space-y-8 md:pl-10 md:rtl:pr-10 md:space-y-10 xl:pl-8 xl:rtl:pr-8 xl:space-y-8" id="career-timeline">
                       <div className="timeline-line" />
 
                       {[
@@ -904,7 +904,7 @@ export default function App() {
                         >
                           {/* Indicator code dot */}
                           <div
-                            className="absolute -left-[30px] rtl:-right-[30px] timeline-dot"
+                            className="absolute -left-[30px] rtl:-right-[30px] md:-left-[38px] md:rtl:-right-[38px] xl:-left-[30px] xl:rtl:-right-[30px] timeline-dot"
                             style={{
                               backgroundColor: item.color,
                               boxShadow: `0 0 10px ${item.color}`
@@ -918,8 +918,8 @@ export default function App() {
                               </span>
                             )}
                           </div>
-                          <h3 className="text-lg font-bold text-white">{item.title}</h3>
-                          <p className="text-sm text-on-surface-variant max-w-xl">{item.desc}</p>
+                          <h3 className="text-lg font-bold text-white md:text-xl xl:text-lg">{item.title}</h3>
+                          <p className="text-sm text-on-surface-variant max-w-xl md:text-base xl:text-sm">{item.desc}</p>
                         </motion.div>
                       ))}
                     </div>
