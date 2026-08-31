@@ -813,7 +813,7 @@ export default function App() {
                     className="grid grid-cols-3 gap-3"
                   >
                     <div className="glass-panel rounded-xl p-4 text-center">
-                      <div className={`whitespace-nowrap text-[11.5px] font-black leading-tight sm:text-lg ${getPrimaryTextColor()}`}>{lang === 'en' ? 'Responsive' : 'متجاوبة'}</div>
+                      <div className={`whitespace-nowrap text-[13px] font-black leading-tight sm:text-lg ${getPrimaryTextColor()}`}>{lang === 'en' ? 'Responsive' : 'متجاوبة'}</div>
                       <div className="font-mono text-[10px] text-on-surface-variant uppercase mt-1">
                         {t.yearsLabel}
                       </div>
