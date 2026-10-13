@@ -1503,7 +1503,7 @@ export default function App() {
 
                         {/* WhatsApp */}
                         <a
-                          href="https://wa.me/201148823888"
+                          href="https://wa.me/201023253827"
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={() => triggerBeep(950, 0.05)}
@@ -1515,7 +1515,7 @@ export default function App() {
                             </svg>
                             <span className="font-bold whitespace-nowrap">{t.whatsappLabel}</span>
                           </div>
-                          <span className="font-mono text-[9px] md:text-[10px] text-primary-container px-1.5 py-0.5 rounded bg-primary-container/10 group-hover:bg-primary-container/20 group-hover:text-white transition-all select-all">+201148823888</span>
+                          <span className="font-mono text-[9px] md:text-[10px] text-primary-container px-1.5 py-0.5 rounded bg-primary-container/10 group-hover:bg-primary-container/20 group-hover:text-white transition-all select-all">+201023253827</span>
                         </a>
 
                         {/* Email */}
